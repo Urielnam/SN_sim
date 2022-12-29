@@ -39,16 +39,16 @@ class ClockAndDataDraw:
         a1.cla()
         a1.set_xlabel("Time")
         a1.set_ylabel("Average Data Age")
-        # code to calculate step function.
-        ages = [env.now - a.time for a in (sensor_array_queue + array_analysis_queue + analysis_array_queue +
-                                            array_action_queue + action_array_queue + array_sensor_queue)]
-        data_age[float(env.now)].append(ages)
-
-        for key in image_map2.keys():
-            data_age_by_type[key][float(env.now)].append(
-                [env.now - a.time for a in [
-                    i for i in (sensor_array_queue + array_analysis_queue + analysis_array_queue +
-                                array_action_queue + action_array_queue + array_sensor_queue) if i.type == key]])
+        # # code to calculate step function.
+        # ages = [env.now - a.time for a in (sensor_array_queue + array_analysis_queue + analysis_array_queue +
+        #                                     array_action_queue + action_array_queue + array_sensor_queue)]
+        # data_age[float(env.now)].append(ages)
+        #
+        # for key in image_map2.keys():
+        #     data_age_by_type[key][float(env.now)].append(
+        #         [env.now - a.time for a in [
+        #             i for i in (sensor_array_queue + array_analysis_queue + analysis_array_queue +
+        #                         array_action_queue + action_array_queue + array_sensor_queue) if i.type == key]])
 
         a1.plot([t for (t, age) in data_age.items()], [np.mean(age) for (t, age) in data_age.items()], label="all")
 
@@ -63,7 +63,7 @@ class ClockAndDataDraw:
         a2.set_xlabel("Time")
         a2.set_ylabel("Accumulated Success")
         # code to calculate step function.
-        successful_operations_total[float(env.now)].append(len([x for x in successful_operations if x > env.now - dt]))
+        # successful_operations_total[float(env.now)].append(len([x for x in successful_operations if x > env.now - dt]))
         a2.plot([t for (t, success) in successful_operations_total.items()],
                 [success for (t, success) in successful_operations_total.items()],
                 label = "Average success over last " + str(dt) + " timesteps")
@@ -72,16 +72,16 @@ class ClockAndDataDraw:
         a3.cla()
         a3.set_xlabel("Time")
         a3.set_ylabel("System Cost")
-        # code to calculate step function.
-        number_of_sensors[float(env.now)].append(len(sensor_list))
-        agent_flow_rates_by_type["Array"][float(env.now)].append(array.flow_rate)
-        agent_flow_rates_by_type["Analysis Station"][float(env.now)].append(
-            analysis_station.flow_rate)
-        agent_flow_rates_by_type["Action Station"][float(env.now)].append(
-            action_station.flow_rate)
-        total_resource[float(env.now)].append(len(sensor_list)+array.flow_rate +
-                                              analysis_station.flow_rate +
-                                              action_station.flow_rate)
+        # # code to calculate step function.
+        # number_of_sensors[float(env.now)].append(len(sensor_list))
+        # agent_flow_rates_by_type["Array"][float(env.now)].append(array.flow_rate)
+        # agent_flow_rates_by_type["Analysis Station"][float(env.now)].append(
+        #     analysis_station.flow_rate)
+        # agent_flow_rates_by_type["Action Station"][float(env.now)].append(
+        #     action_station.flow_rate)
+        # total_resource[float(env.now)].append(len(sensor_list)+array.flow_rate +
+        #                                       analysis_station.flow_rate +
+        #                                       action_station.flow_rate)
 
 
 
@@ -103,9 +103,7 @@ class ClockAndDataDraw:
         # "in motion" for the last X timesteps.
         # sum of number of times the resources were re-allocated.
 
-        dt = 5
-
-        self_organization_measure[float(env.now)].append(calc_self_org(dt))
+        # self_organization_measure[float(env.now)].append(calc_self_org(dt))
         a2.plot([t for (t,a) in self_organization_measure.items()],
                 [a for (t,a) in self_organization_measure.items()],
                 label = "Self-organization effort over last " + str(dt) + " timesteps")
