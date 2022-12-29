@@ -7,6 +7,7 @@ from collections import defaultdict
 from datetime import datetime
 import os
 import csv
+from BackendClasses import clockanddatacalc_func
 
 import tkinter as tk
 
@@ -246,7 +247,6 @@ def calc_self_org(dt):
     return np.sum(changes_by_key)
 
 
-
 class ClockAndData:
     def __init__(self, canvas, x1, y1, x2, y2, time):
         # Draw the inital state of the clock and data on the canvas
@@ -267,6 +267,9 @@ class ClockAndData:
         self.canvas.update()
 
     def tick(self, time):
+        dt = 5
+
+
         # re-draw the clock and data fields on the canvas. Also update the matplotlib charts
         self.canvas.delete(self.time)
 
@@ -289,15 +292,15 @@ class ClockAndData:
         a1.set_xlabel("Time")
         a1.set_ylabel("Average Data Age")
         # code to calculate step function.
-        ages = [env.now - a.time for a in (sensor_array_queue + array_analysis_queue + analysis_array_queue +
-                                            array_action_queue + action_array_queue + array_sensor_queue)]
-        data_age[float(env.now)].append(ages)
+        # ages = [env.now - a.time for a in (sensor_array_queue + array_analysis_queue + analysis_array_queue +
+        #                                     array_action_queue + action_array_queue + array_sensor_queue)]
+        # data_age[float(env.now)].append(ages)
 
-        for key in image_map2.keys():
-            data_age_by_type[key][float(env.now)].append(
-                [env.now - a.time for a in [
-                    i for i in (sensor_array_queue + array_analysis_queue + analysis_array_queue +
-                                array_action_queue + action_array_queue + array_sensor_queue) if i.type == key]])
+        # for key in image_map2.keys():
+        #     data_age_by_type[key][float(env.now)].append(
+        #         [env.now - a.time for a in [
+        #             i for i in (sensor_array_queue + array_analysis_queue + analysis_array_queue +
+        #                         array_action_queue + action_array_queue + array_sensor_queue) if i.type == key]])
 
         a1.plot([t for (t, age) in data_age.items()], [np.mean(age) for (t, age) in data_age.items()], label="all")
 
@@ -306,13 +309,13 @@ class ClockAndData:
                     [np.mean(age) for (t, age) in data_age_by_type[key].items()], label = key)
         a1.legend(loc="upper left")
 
-        dt = 5
+        # dt = 5
 
         a2.cla()
         a2.set_xlabel("Time")
         a2.set_ylabel("Accumulated Success")
         # code to calculate step function.
-        successful_operations_total[float(env.now)].append(len([x for x in successful_operations if x > env.now - dt]))
+        # successful_operations_total[float(env.now)].append(len([x for x in successful_operations if x > env.now - dt]))
         a2.plot([t for (t, success) in successful_operations_total.items()],
                 [success for (t, success) in successful_operations_total.items()],
                 label = "Average success over last " + str(dt) + " timesteps")
@@ -322,15 +325,15 @@ class ClockAndData:
         a3.set_xlabel("Time")
         a3.set_ylabel("System Cost")
         # code to calculate step function.
-        number_of_sensors[float(env.now)].append(len(sensor_list))
-        agent_flow_rates_by_type["Array"][float(env.now)].append(array.flow_rate)
-        agent_flow_rates_by_type["Analysis Station"][float(env.now)].append(
-            analysis_station.flow_rate)
-        agent_flow_rates_by_type["Action Station"][float(env.now)].append(
-            action_station.flow_rate)
-        total_resource[float(env.now)].append(len(sensor_list)+array.flow_rate +
-                                              analysis_station.flow_rate +
-                                              action_station.flow_rate)
+        # number_of_sensors[float(env.now)].append(len(sensor_list))
+        # agent_flow_rates_by_type["Array"][float(env.now)].append(array.flow_rate)
+        # agent_flow_rates_by_type["Analysis Station"][float(env.now)].append(
+        #     analysis_station.flow_rate)
+        # agent_flow_rates_by_type["Action Station"][float(env.now)].append(
+        #     action_station.flow_rate)
+        # total_resource[float(env.now)].append(len(sensor_list)+array.flow_rate +
+        #                                       analysis_station.flow_rate +
+        #                                       action_station.flow_rate)
 
 
 
@@ -352,9 +355,9 @@ class ClockAndData:
         # "in motion" for the last X timesteps.
         # sum of number of times the resources were re-allocated.
 
-        dt = 5
+        # dt = 5
 
-        self_organization_measure[float(env.now)].append(calc_self_org(dt))
+        # self_organization_measure[float(env.now)].append(calc_self_org(dt))
         a2.plot([t for (t,a) in self_organization_measure.items()],
                 [a for (t,a) in self_organization_measure.items()],
                 label = "Self-organization effort over last " + str(dt) + " timesteps")
@@ -378,6 +381,12 @@ def create_clock(env):
 
     while True:
         yield env.timeout(0.1)
+        dt = 5
+        clockanddatacalc_func(image_map2, data_age_by_type, env, sensor_array_queue, array_analysis_queue,
+                              analysis_array_queue, array_action_queue, action_array_queue, array_sensor_queue,
+                              data_age, self_organization_measure, dt, agent_flow_rates_by_type, number_of_sensors,
+                              successful_operations_total, successful_operations, sensor_list, array, analysis_station,
+                              action_station, total_resource)
         clock.tick(env.now)
         sensor_array.paint_queue()
         array_sensor.paint_queue()
@@ -710,6 +719,7 @@ def save_graph(env):
 
     svg_file_name = DATA_DIR + "\\" + save_name + ".svg"
     f.savefig(svg_file_name)
+
 
 
 env = simpy.rt.RealtimeEnvironment(factor = 0.1, strict = False)
