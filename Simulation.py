@@ -94,7 +94,7 @@ connecting_graph = {
 main = tk.Tk()
 main.title("ISR Simulation")
 main.config(bg="#fff")
-logo = tk.PhotoImage(file = "images/250px-Masha.png")
+logo = tk.PhotoImage(file = "images/title.png")
 top_frame = tk.Frame(main)
 top_frame.pack(side=tk.TOP, expand = False)
 tk.Label(top_frame, image = logo, bg = "#000007", height = 65, width = 1300).pack(side=tk.LEFT, expand = False)
@@ -103,9 +103,9 @@ canvas.pack(side=tk.TOP, expand = False)
 
 
 image_map2 = {
-    "intel": tk.PhotoImage(file = "images/folder_resize.png"),
-    "feedback": tk.PhotoImage(file = "images/Utilities-Feedback-Assistant-icon_resize.png"),
-    "target": tk.PhotoImage(file = "images/Target-Audience-icon_resize.png")
+    "intel": tk.PhotoImage(file = "images/folder.png"),
+    "feedback": tk.PhotoImage(file = "images/feedback.png"),
+    "target": tk.PhotoImage(file = "images/target.png")
 }
 
 for key in image_map2.keys():
