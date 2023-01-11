@@ -21,19 +21,19 @@ import tkinter as tk
 # CONFIGURATION
 # -------------------------
 
-data_age = defaultdict(lambda : [])
-data_age_by_type = defaultdict(lambda : [])
+data_age = defaultdict(lambda: [])
+data_age_by_type = defaultdict(lambda: [])
 successful_operations = []
-successful_operations_total = defaultdict(lambda : [])
-number_of_sensors = defaultdict(lambda : [])
-agent_flow_rates_by_type = defaultdict(lambda : [])
-agent_flow_rates_by_type["Array"] = defaultdict(lambda : [])
-agent_flow_rates_by_type["Analysis Station"] = defaultdict(lambda : [])
-agent_flow_rates_by_type["Action Station"] = defaultdict(lambda : [])
-total_resource = defaultdict(lambda : [])
-self_organization_measure = defaultdict(lambda : [])
+successful_operations_total = defaultdict(lambda: [])
+number_of_sensors = defaultdict(lambda: [])
+agent_flow_rates_by_type = defaultdict(lambda: [])
+agent_flow_rates_by_type["Array"] = defaultdict(lambda: [])
+agent_flow_rates_by_type["Analysis Station"] = defaultdict(lambda: [])
+agent_flow_rates_by_type["Action Station"] = defaultdict(lambda: [])
+total_resource = defaultdict(lambda: [])
+self_organization_measure = defaultdict(lambda: [])
 max_resource = 15
-end_time = 1000
+end_time = 20
 
 # -------------------------
 # ANALYTICAL GLOBALS
@@ -50,7 +50,7 @@ analysis_sublist = []
 sensor_list = []
 # array that will save the time from data creation to data use at the analysis station.
 analysis_data_usage_time = []
-# array to save the time from data analysis to data useage.
+# array to save the time from data analysis to data usage.
 action_data_usage_time = []
 
 graph_list = [sensor_array_queue, analysis_array_queue, action_array_queue,
@@ -87,30 +87,35 @@ connecting_graph = {
     }
 }
 
+static_image_map_keys = ["intel", "feedback", "target"]
+
+# used for backend classes calculation
+for key in static_image_map_keys:
+    data_age_by_type[key] = defaultdict(lambda: [])
+
 # -------------------------
 # UI/ANIMATION
 # -------------------------
 
+# initiate basic definitions for UI representation
 main = tk.Tk()
 main.title("ISR Simulation")
 main.config(bg="#fff")
-logo = tk.PhotoImage(file = "images/title.png")
+logo = tk.PhotoImage(file="images/title.png")
 top_frame = tk.Frame(main)
-top_frame.pack(side=tk.TOP, expand = False)
-tk.Label(top_frame, image = logo, bg = "#000007", height = 65, width = 1300).pack(side=tk.LEFT, expand = False)
-canvas = tk.Canvas(main, width = 1300, height = 350, bg = "white")
-canvas.pack(side=tk.TOP, expand = False)
+top_frame.pack(side=tk.TOP, expand=False)
+tk.Label(top_frame, image=logo, bg="#000007", height=65, width=1300).pack(side=tk.LEFT, expand=False)
+canvas = tk.Canvas(main, width=1300, height=350, bg="white")
+canvas.pack(side=tk.TOP, expand=False)
 
 
 image_map2 = {
-    "intel": tk.PhotoImage(file = "images/folder.png"),
-    "feedback": tk.PhotoImage(file = "images/feedback.png"),
-    "target": tk.PhotoImage(file = "images/target.png")
+    "intel": tk.PhotoImage(file="images/folder.png"),
+    "feedback": tk.PhotoImage(file="images/feedback.png"),
+    "target": tk.PhotoImage(file="images/target.png")
 }
 
-for key in image_map2.keys():
-    data_age_by_type[key] = defaultdict(lambda: [])
-
+# define baseline for graph plotting
 f = plt.Figure(figsize=(2, 2), dpi=72)
 a3 = f.add_subplot(121)
 a3.plot()
@@ -139,7 +144,6 @@ class IsrElement:
         canvas.create_rectangle(x_top, y_top, x_top + length, y_top + height)
         canvas.create_text(x_top + 10, y_top + 7, anchor = tk.NW, text = f"{element_name}")
         self.canvas.update()
-
 
 
 class QueueGraphics:
@@ -185,7 +189,7 @@ class QueueGraphics:
 # the queue will call that function with a specific location.
 # Info is FIFO, so the function will need to delete the specific object and repaint. might need a loop.
 
-
+# TODO: move this to ui.py
 sensor_array = QueueGraphics(sensor_array_queue, 25, "Sensor to \n Array", canvas, 100, start_row)
 array_sensor = QueueGraphics(array_sensor_queue, 25, "Array to \n Sensor", canvas,
                              200, start_row)
@@ -224,27 +228,27 @@ def paint_sensors():
         canvas.update()
 
 
-def calc_self_org(dt):
-    changes_by_key = []
-
-    for key_n in agent_flow_rates_by_type.keys():
-        change_count = 0
-        relevant_list_of_timesteps_keys = [x for x in agent_flow_rates_by_type[key_n].keys() if x > (env.now - dt)]
-        for x in range(len(relevant_list_of_timesteps_keys) - 1):
-            if agent_flow_rates_by_type[key_n][relevant_list_of_timesteps_keys[x]] != \
-                    agent_flow_rates_by_type[key_n][relevant_list_of_timesteps_keys[x + 1]]:
-                change_count += 1
-        changes_by_key.append(change_count)
-
-    change_count = 0
-    relevant_list_of_timesteps = [x for x in number_of_sensors.keys() if x > (env.now - dt)]
-    for x in range(len(relevant_list_of_timesteps) - 1):
-        if number_of_sensors[relevant_list_of_timesteps[x]] != \
-                number_of_sensors[relevant_list_of_timesteps[x + 1]]:
-            change_count += 1
-    changes_by_key.append(change_count)
-
-    return np.sum(changes_by_key)
+# def calc_self_org(dt):
+#     changes_by_key = []
+#
+#     for key_n in agent_flow_rates_by_type.keys():
+#         change_count = 0
+#         relevant_list_of_timesteps_keys = [x for x in agent_flow_rates_by_type[key_n].keys() if x > (env.now - dt)]
+#         for x in range(len(relevant_list_of_timesteps_keys) - 1):
+#             if agent_flow_rates_by_type[key_n][relevant_list_of_timesteps_keys[x]] != \
+#                     agent_flow_rates_by_type[key_n][relevant_list_of_timesteps_keys[x + 1]]:
+#                 change_count += 1
+#         changes_by_key.append(change_count)
+#
+#     change_count = 0
+#     relevant_list_of_timesteps = [x for x in number_of_sensors.keys() if x > (env.now - dt)]
+#     for x in range(len(relevant_list_of_timesteps) - 1):
+#         if number_of_sensors[relevant_list_of_timesteps[x]] != \
+#                 number_of_sensors[relevant_list_of_timesteps[x + 1]]:
+#             change_count += 1
+#     changes_by_key.append(change_count)
+#
+#     return np.sum(changes_by_key)
 
 
 class ClockAndData:
@@ -258,49 +262,23 @@ class ClockAndData:
         self.train = canvas.create_rectangle(self.x1, self.y1, self.x2, self.y2, fill="#fff")
         self.time = canvas.create_text(self.x1 + 10, self.y1 + 10, text="Time = " + str(round(time, 1)) + "m",
                                        anchor=tk.NW)
-        # Code to show the seller wait time at queue.
-        #self.seller_wait = canvas.create_text(self.x1 + 10, self.y1 + 40,
-        #                                      text="Avg. Seller Wait  = " + str(avg_wait(seller_waits)), anchor=tk.NW)
-        # Code to show the scanner wait time at queue.
-        #self.scan_wait = canvas.create_text(self.x1 + 10, self.y1 + 70,
-        #                                    text="Avg. Scanner Wait = " + str(avg_wait(scan_waits)), anchor=tk.NW)
+
         self.canvas.update()
 
     def tick(self, time):
         dt = 5
 
-
         # re-draw the clock and data fields on the canvas. Also update the matplotlib charts
         self.canvas.delete(self.time)
 
-        # Delete previous data.
-        #self.canvas.delete(self.seller_wait)
-        #self.canvas.delete(self.scan_wait)
-
         self.time = canvas.create_text(self.x1 + 10, self.y1 + 10, text="Time = " + str(round(time, 1)) + "m",
                                        anchor=tk.NW)
-        # set new data.
-        #self.seller_wait = canvas.create_text(self.x1 + 10, self.y1 + 30,
-        #                                      text="Avg. Seller Wait  = " + str(avg_wait(seller_waits)) + "m",
-        #                                      anchor=tk.NW)
-        #self.scan_wait = canvas.create_text(self.x1 + 10, self.y1 + 50,
-        #                                    text="Avg. Scanner Wait = " + str(avg_wait(scan_waits)) + "m", anchor=tk.NW)
 
         paint_sensors()
 
         a1.cla()
         a1.set_xlabel("Time")
         a1.set_ylabel("Average Data Age")
-        # code to calculate step function.
-        # ages = [env.now - a.time for a in (sensor_array_queue + array_analysis_queue + analysis_array_queue +
-        #                                     array_action_queue + action_array_queue + array_sensor_queue)]
-        # data_age[float(env.now)].append(ages)
-
-        # for key in image_map2.keys():
-        #     data_age_by_type[key][float(env.now)].append(
-        #         [env.now - a.time for a in [
-        #             i for i in (sensor_array_queue + array_analysis_queue + analysis_array_queue +
-        #                         array_action_queue + action_array_queue + array_sensor_queue) if i.type == key]])
 
         a1.plot([t for (t, age) in data_age.items()], [np.mean(age) for (t, age) in data_age.items()], label="all")
 
@@ -314,28 +292,14 @@ class ClockAndData:
         a2.cla()
         a2.set_xlabel("Time")
         a2.set_ylabel("Accumulated Success")
-        # code to calculate step function.
-        # successful_operations_total[float(env.now)].append(len([x for x in successful_operations if x > env.now - dt]))
+
         a2.plot([t for (t, success) in successful_operations_total.items()],
                 [success for (t, success) in successful_operations_total.items()],
-                label = "Average success over last " + str(dt) + " timesteps")
-
+                label="Average success over last " + str(dt) + " timesteps")
 
         a3.cla()
         a3.set_xlabel("Time")
         a3.set_ylabel("System Cost")
-        # code to calculate step function.
-        # number_of_sensors[float(env.now)].append(len(sensor_list))
-        # agent_flow_rates_by_type["Array"][float(env.now)].append(array.flow_rate)
-        # agent_flow_rates_by_type["Analysis Station"][float(env.now)].append(
-        #     analysis_station.flow_rate)
-        # agent_flow_rates_by_type["Action Station"][float(env.now)].append(
-        #     action_station.flow_rate)
-        # total_resource[float(env.now)].append(len(sensor_list)+array.flow_rate +
-        #                                       analysis_station.flow_rate +
-        #                                       action_station.flow_rate)
-
-
 
         a3.plot([t for (t, a) in number_of_sensors.items()],
                 [a for (t, a) in number_of_sensors.items()],
@@ -355,15 +319,11 @@ class ClockAndData:
         # "in motion" for the last X timesteps.
         # sum of number of times the resources were re-allocated.
 
-        # dt = 5
-
-        # self_organization_measure[float(env.now)].append(calc_self_org(dt))
         a2.plot([t for (t,a) in self_organization_measure.items()],
                 [a for (t,a) in self_organization_measure.items()],
                 label = "Self-organization effort over last " + str(dt) + " timesteps")
 
         a2.legend(loc="upper left")
-
 
         data_plot.draw()
         self.canvas.update()
@@ -387,6 +347,7 @@ def create_clock(env):
                               data_age, self_organization_measure, dt, agent_flow_rates_by_type, number_of_sensors,
                               successful_operations_total, successful_operations, sensor_list, array, analysis_station,
                               action_station, total_resource)
+        # TODO: check if we can move all the below (it's all ui functions) to the ui.py or UIClasses.py
         clock.tick(env.now)
         sensor_array.paint_queue()
         array_sensor.paint_queue()
@@ -395,6 +356,7 @@ def create_clock(env):
         array_action.paint_queue()
         action_array.paint_queue()
         analysis_sublist_visual.paint_queue()
+
 
 # Intel object. Has a real/wrong status and time created
 # data types: "intel", "feedback"
@@ -439,6 +401,7 @@ class Array(object):
         self.move_counter = 0
         self.x = 5
         self.y = 20
+        # TODO: split out the presentation of this, not sure how.
         self.presentation = IsrElement("Array", canvas, self.x, self.y, 1290, start_row-30)
         self.item_presentation =[]
         self.canvas = canvas
@@ -476,39 +439,9 @@ class Array(object):
                 second_array = connecting_graph[selected_array][start_nodes[selected_array][0].type]
                 yield self.env.process(self.move_item(start_nodes[selected_array], end_nodes[second_array]))
 
-            #else:
-            #    if len(action_array_queue) > 0:
-            #        yield self.env.process(self.move_item(action_array_queue, array_analysis_queue))
-
-            #    else:
-            #        if len(analysis_array_queue) > 0:
-            #            if analysis_array_queue[0].type == 'feedback':
-            #                yield self.env.process(self.move_item(analysis_array_queue, array_sensor_queue))
-
-            #            else:
-            #                yield self.env.process(self.move_item(analysis_array_queue, array_action_queue))
-
-            #        else:
-            #            if len(sensor_array_queue) > 0:
-            #                yield self.env.process(self.move_item(sensor_array_queue, array_analysis_queue))
-
 
 def check_queue():
     return len(sensor_array_queue) + len(analysis_array_queue) + len(action_array_queue)
-
-#    def move_between(self, sender, reciver):
-#
-#       # a check to see how many hand changes were made.
-#        # self.move_counter = self.move_counter + 1
-#        # print(self.move_counter)
-#
-#        if len(sender) > 0:
-#            a=sender[0]
-#            sender.pop(0)
-
-#            reciver.append(a)
-
-#            visualize_all()
 
 
 # need to create analysis station, then action station and then start messing with accuricy.
@@ -527,7 +460,6 @@ class AnalysisStation(object):
     def run(self):
 
         while True:
-            # print(array_analysis_queue)
             # first, check for feedback in first cell, if there isn't any feedback, proceed to analyze the data.
 
             bank_size = 2
@@ -603,21 +535,8 @@ class ActionStation(object):
 
 
 # function to visualize the data
-def visualize_data(name, array):
-    print('%s is %d long' % (name, len(array)))
-
-
-# def visualize_all():
-#    visualize_data('sensor_array_queue', sensor_array_queue)
-#    visualize_data('array_analysis_queue', array_analysis_queue)
-#    visualize_data('analysis_array_queue', analysis_array_queue)
-#    visualize_data('array_action_queue', array_action_queue)
-#    visualize_data('action_array_queue', action_array_queue)
-#    visualize_data('array_sensor_queue', array_sensor_queue)
-#    print(feedback_data_usage_time)
-#    print(analysis_data_usage_time)
-#    print(action_data_usage_time)
-#    print("end cycle %d" % env.now)
+# def visualize_data(name, array):
+#     print('%s is %d long' % (name, len(array)))
 
 def check_max_resource():
     return(len(sensor_list)+array.flow_rate +
@@ -695,7 +614,7 @@ def action_upgrade(env, action):
 def save_graph(env):
     yield env.timeout(end_time-0.1)
     save_name = "self org plot " + datetime.now().ctime() + " end time " + str(end_time)
-    save_name = save_name.replace(":","_")
+    save_name = save_name.replace(":", "_")
 
     ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
     DATA_DIR = os.path.join(ROOT_DIR, save_name)
@@ -704,7 +623,6 @@ def save_graph(env):
 
     with open(CSV_PATH, 'w', encoding='UTF8') as file:
         writer = csv.writer(file)
-
 
         for ax in f.get_axes():
             writer.writerow([ax.get_xlabel,ax.get_ylabel])
@@ -716,10 +634,8 @@ def save_graph(env):
                 for n in range(len(x)):
                     writer.writerow([x[n],y[n]])
 
-
     svg_file_name = DATA_DIR + "\\" + save_name + ".svg"
     f.savefig(svg_file_name)
-
 
 
 env = simpy.rt.RealtimeEnvironment(factor = 0.1, strict = False)
