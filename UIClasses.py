@@ -1,5 +1,106 @@
+import tkinter as tk
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
+
+f = plt.Figure(figsize=(2, 2), dpi=72)
+a3 = f.add_subplot(121)
+a3.plot()
+a1 = f.add_subplot(222)
+a1.plot()
+a2 = f.add_subplot(224)
+a2.plot()
+
+
+class IsrElement:
+    text_height = 30
+    icon_top_margin = -8
+
+    def __init__(self, element_name, canvas, x_top, y_top, length, height):
+        self.element_name = element_name
+        self.x_top = x_top
+        self.y_top = y_top
+        self.length = length
+        self.canvas = canvas
+
+        canvas.create_rectangle(x_top, y_top, x_top + length, y_top + height)
+        canvas.create_text(x_top + 10, y_top + 7, anchor = tk.NW, text = f"{element_name}")
+        self.canvas.update()
+
+
+
+class QueueGraphics:
+    text_height = 30
+    icon_top_margin = -8
+
+    def __init__(self, data_container, icon_height,  data_name, canvas, x_top, y_top):
+        # self.icon_file = icon_file
+        self.icon_height = icon_height
+        self.queue_name = data_name
+        self.canvas = canvas
+        self.x_top = x_top
+        self.y_top = y_top
+
+        # self.image = tk.PhotoImage(file = self.icon_file)
+        self.icons = []
+        self.data_contained = data_container
+        canvas.create_text(x_top, y_top, anchor = tk.NW, text = f"{data_name}")
+        self.canvas.update()
+
+    def paint_queue(self):
+        # delete all current representations
+        for i in self.icons:
+            to_del = self.icons.pop()
+            self.canvas.delete(to_del)
+            self.canvas.update()
+        # redraw for all current items contained
+        x = self.x_top + 15
+        y = self.y_top + 45
+
+        for i in self.data_contained:
+            self.icons.append(
+                self.canvas.create_image(x, y, anchor = tk.NW, image = image_map2[i.type])
+            )
+            self.icons.append(self.canvas.create_text(x - 10, y + 30, anchor = tk.NW, text = i.id))
+            y = y + self.icon_height + 45
+        self.canvas.update()
+
+class PaintGrapic:
+
+    def __init__(
+            self, canvas, start_row,
+            sensor_array_queue,
+            array_sensor_queue,
+            array_analysis_queue,
+            analysis_sublist,
+            analysis_array_queue,
+            array_action_queue,
+            action_array_queue
+            ):
+        self.sensor_array = QueueGraphics(sensor_array_queue, 25, "Sensor to \n Array", canvas, 100, start_row)
+        self.array_sensor = QueueGraphics(array_sensor_queue, 25, "Array to \n Sensor", canvas,
+                                     200, start_row)
+        self.array_analysis = QueueGraphics(array_analysis_queue, 25, "Array to \n Analysis", canvas, 300, start_row)
+        self.analysis_sublist_visual = QueueGraphics(analysis_sublist, 25, "Analysis Station \n Bank", canvas, 600,
+                                                start_row)
+        self.analysis_array = QueueGraphics(analysis_array_queue, 25, "Analysis to \n Array", canvas, 700, start_row)
+        self.array_action = QueueGraphics(array_action_queue, 25, "Array to \n Action", canvas, 800, start_row)
+        self.action_array = QueueGraphics(action_array_queue, 25, "Action to \n Array", canvas, 900, start_row)
+
+
+    def tick(self):
+        self.sensor_array.paint_queue()
+        self.array_sensor.paint_queue()
+        self.array_analysis.paint_queue()
+        self.analysis_array.paint_queue()
+        self.array_action.paint_queue()
+        self.action_array.paint_queue()
+        self.analysis_sublist_visual.paint_queue()
+
+
 class ClockAndDataDraw:
-    def __init__(self, canvas, x1, y1, x2, y2, time):
+
+    def __init__(self, canvas, x1, y1, x2, y2, time, main):
         # Draw the inital state of the clock and data on the canvas
         self.x1 = x1
         self.y1 = y1
@@ -16,8 +117,36 @@ class ClockAndDataDraw:
         #self.scan_wait = canvas.create_text(self.x1 + 10, self.y1 + 70,
         #                                    text="Avg. Scanner Wait = " + str(avg_wait(scan_waits)), anchor=tk.NW)
         self.canvas.update()
+        self.data_plot = FigureCanvasTkAgg(f, master=main)
+        self.data_plot.get_tk_widget().config(height=400)
+        self.data_plot.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
 
-    def tick(self, time):
+    def paint_sensors():
+        for i in sensor_list_visual:
+            to_del = sensor_list_visual.pop()
+            canvas.delete(to_del)
+            canvas.update()
+
+        n = 1
+
+        for x in sensor_list:
+            element_name = x.name
+            x_top = 5
+            y_top = start_row + (regular_height + 10) * (n - 1)
+            n = n + 1
+            length = 60
+            height = regular_height
+
+            sensor_list_visual.append(canvas.create_rectangle(x_top, y_top,
+                                                              x_top + length,
+                                                              y_top + height))
+            sensor_list_visual.append(canvas.create_text(x_top + 10, y_top + 7,
+                                                         anchor=tk.NW,
+                                                         text=f"{element_name}"))
+            canvas.update()
+
+
+    def tick(self, time, canvas):
         # re-draw the clock and data fields on the canvas. Also update the matplotlib charts
         self.canvas.delete(self.time)
 
@@ -34,7 +163,7 @@ class ClockAndDataDraw:
         #self.scan_wait = canvas.create_text(self.x1 + 10, self.y1 + 50,
         #                                    text="Avg. Scanner Wait = " + str(avg_wait(scan_waits)) + "m", anchor=tk.NW)
 
-        paint_sensors()
+        self.paint_sensors()
 
         a1.cla()
         a1.set_xlabel("Time")
@@ -50,7 +179,7 @@ class ClockAndDataDraw:
         #             i for i in (sensor_array_queue + array_analysis_queue + analysis_array_queue +
         #                         array_action_queue + action_array_queue + array_sensor_queue) if i.type == key]])
 
-        a1.plot([t for (t, age) in data_age.items()], [np.mean(age) for (t, age) in data_age.items()], label="all")
+        a1.plot([t for (t, age) in  .items()], [np.mean(age) for (t, age) in data_age.items()], label="all")
 
         for key in image_map2.keys():
             a1.plot([t for (t, age) in data_age_by_type[key].items()],
@@ -111,5 +240,5 @@ class ClockAndDataDraw:
         a2.legend(loc="upper left")
 
 
-        data_plot.draw()
+        self.data_plot.draw()
         self.canvas.update()
