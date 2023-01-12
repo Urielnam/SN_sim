@@ -32,7 +32,7 @@ agent_flow_rates_by_type["Action Station"] = defaultdict(lambda: [])
 total_resource = defaultdict(lambda: [])
 self_organization_measure = defaultdict(lambda: [])
 max_resource = 15
-end_time = 1000
+end_time = 20
 
 # TODO: replace this
 ui = True
@@ -52,7 +52,7 @@ analysis_sublist = []
 sensor_list = []
 # array that will save the time from data creation to data use at the analysis station.
 analysis_data_usage_time = []
-# array to save the time from data analysis to data useage.
+# array to save the time from data analysis to data usage.
 action_data_usage_time = []
 
 graph_list = [sensor_array_queue, analysis_array_queue, action_array_queue,
@@ -89,98 +89,26 @@ connecting_graph = {
     }
 }
 
-# -------------------------
-# UI/ANIMATION
-# -------------------------
-#
-# main = tk.Tk()
-# main.title("ISR Simulation")
-# main.config(bg="#fff")
-# logo = tk.PhotoImage(file = "images/250px-Masha.png")
-# top_frame = tk.Frame(main)
-# top_frame.pack(side=tk.TOP, expand = False)
-# tk.Label(top_frame, image = logo, bg = "#000007", height = 65, width = 1300).pack(side=tk.LEFT, expand = False)
-# canvas = tk.Canvas(main, width = 1300, height = 350, bg = "white")
-# canvas.pack(side=tk.TOP, expand = False)
-#
-#
+static_image_map_keys = ["intel", "feedback", "target"]
+
+# used for backend classes calculation
+for key in static_image_map_keys:
+    data_age_by_type[key] = defaultdict(lambda: [])
+
+
 image_map2 = {
-    "intel": tk.PhotoImage(file = "images/folder.png"),
-    "feedback": tk.PhotoImage(file = "images/feedback.png"),
-    "target": tk.PhotoImage(file = "images/target.png")
+    "intel": tk.PhotoImage(file="images/folder.png"),
+    "feedback": tk.PhotoImage(file="images/feedback.png"),
+    "target": tk.PhotoImage(file="images/target.png")
 }
 
 
 for key in image_map2.keys():
     data_age_by_type[key] = defaultdict(lambda: [])
 
-# f = plt.Figure(figsize=(2, 2), dpi=72)
-# a3 = f.add_subplot(121)
-# a3.plot()
-# a1 = f.add_subplot(222)
-# a1.plot()
-# a2 = f.add_subplot(224)
-# a2.plot()
-# data_plot = FigureCanvasTkAgg(f, master=main)
-# data_plot.get_tk_widget().config(height = 400)
-# data_plot.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
 
 start_row = 95
 regular_height = 30
-#
-# class IsrElement:
-#     text_height = 30
-#     icon_top_margin = -8
-#
-#     def __init__(self, element_name, canvas, x_top, y_top, length, height):
-#         self.element_name = element_name
-#         self.x_top = x_top
-#         self.y_top = y_top
-#         self.length = length
-#         self.canvas = canvas
-#
-#         canvas.create_rectangle(x_top, y_top, x_top + length, y_top + height)
-#         canvas.create_text(x_top + 10, y_top + 7, anchor = tk.NW, text = f"{element_name}")
-#         self.canvas.update()
-#
-#
-#
-# class QueueGraphics:
-#     text_height = 30
-#     icon_top_margin = -8
-#
-#     def __init__(self, data_container, icon_height,  data_name, canvas, x_top, y_top):
-#         # self.icon_file = icon_file
-#         self.icon_height = icon_height
-#         self.queue_name = data_name
-#         self.canvas = canvas
-#         self.x_top = x_top
-#         self.y_top = y_top
-#
-#         # self.image = tk.PhotoImage(file = self.icon_file)
-#         self.icons = []
-#         self.data_contained = data_container
-#         canvas.create_text(x_top, y_top, anchor = tk.NW, text = f"{data_name}")
-#         self.canvas.update()
-#
-#     def paint_queue(self):
-#         # delete all current representations
-#         for i in self.icons:
-#             to_del = self.icons.pop()
-#             self.canvas.delete(to_del)
-#             self.canvas.update()
-#         # redraw for all current items contained
-#         x = self.x_top + 15
-#         y = self.y_top + 45
-#
-#         for i in self.data_contained:
-#             self.icons.append(
-#                 self.canvas.create_image(x, y, anchor = tk.NW, image = image_map2[i.type])
-#             )
-#             self.icons.append(self.canvas.create_text(x - 10, y + 30, anchor = tk.NW, text = i.id))
-#             y = y + self.icon_height + 45
-#         self.canvas.update()
-
 
 # the queue graphics manage the location and order of painting stuff but the icon needs to come for the data piece
 # itself whether it's intel, analysis etc.
@@ -198,6 +126,7 @@ if ui:
             analysis_array_queue,
             array_action_queue,
             action_array_queue)
+
 
 # sensor_list_visual = []
 
@@ -228,32 +157,34 @@ if ui:
 #         canvas.update()
 #
 
-def calc_self_org(dt):
-    changes_by_key = []
+# def calc_self_org(dt):
+#     changes_by_key = []
+#
+#     for key_n in agent_flow_rates_by_type.keys():
+#         change_count = 0
+#         relevant_list_of_timesteps_keys = [x for x in agent_flow_rates_by_type[key_n].keys() if x > (env.now - dt)]
+#         for x in range(len(relevant_list_of_timesteps_keys) - 1):
+#             if agent_flow_rates_by_type[key_n][relevant_list_of_timesteps_keys[x]] != \
+#                     agent_flow_rates_by_type[key_n][relevant_list_of_timesteps_keys[x + 1]]:
+#                 change_count += 1
+#         changes_by_key.append(change_count)
+#
+#     change_count = 0
+#     relevant_list_of_timesteps = [x for x in number_of_sensors.keys() if x > (env.now - dt)]
+#     for x in range(len(relevant_list_of_timesteps) - 1):
+#         if number_of_sensors[relevant_list_of_timesteps[x]] != \
+#                 number_of_sensors[relevant_list_of_timesteps[x + 1]]:
+#             change_count += 1
+#     changes_by_key.append(change_count)
+#
+#     return np.sum(changes_by_key)
 
-    for key_n in agent_flow_rates_by_type.keys():
-        change_count = 0
-        relevant_list_of_timesteps_keys = [x for x in agent_flow_rates_by_type[key_n].keys() if x > (env.now - dt)]
-        for x in range(len(relevant_list_of_timesteps_keys) - 1):
-            if agent_flow_rates_by_type[key_n][relevant_list_of_timesteps_keys[x]] != \
-                    agent_flow_rates_by_type[key_n][relevant_list_of_timesteps_keys[x + 1]]:
-                change_count += 1
-        changes_by_key.append(change_count)
-
-    change_count = 0
-    relevant_list_of_timesteps = [x for x in number_of_sensors.keys() if x > (env.now - dt)]
-    for x in range(len(relevant_list_of_timesteps) - 1):
-        if number_of_sensors[relevant_list_of_timesteps[x]] != \
-                number_of_sensors[relevant_list_of_timesteps[x + 1]]:
-            change_count += 1
-    changes_by_key.append(change_count)
-
-    return np.sum(changes_by_key)
 
 
 clock = UIClasses.ClockAndDataDraw(1100, 260, 1290, 340, 0, sensor_list, data_age, data_age_by_type,
                                    successful_operations_total, number_of_sensors, agent_flow_rates_by_type,
                                    total_resource, self_organization_measure)
+
 
 #
 # -------------------------
@@ -272,9 +203,11 @@ def create_clock(env):
                               data_age, self_organization_measure, dt, agent_flow_rates_by_type, number_of_sensors,
                               successful_operations_total, successful_operations, sensor_list, array, analysis_station,
                               action_station, total_resource)
+
         if ui:
             clock.tick(env.now)
             UI_obj.tick()
+
 
 
 # Intel object. Has a real/wrong status and time created
@@ -370,7 +303,6 @@ class AnalysisStation(object):
     def run(self):
 
         while True:
-            # print(array_analysis_queue)
             # first, check for feedback in first cell, if there isn't any feedback, proceed to analyze the data.
 
             bank_size = 2
@@ -438,6 +370,7 @@ class ActionStation(object):
 
             else:
                 yield self.env.timeout(1)
+
 
 
 def check_max_resource():
@@ -513,36 +446,8 @@ def action_upgrade(env, action):
 # all plotted data - need to check how it's done maybe?
 
 
-# def save_graph(env):
-#     yield env.timeout(end_time-0.1)
-#     save_name = "self org plot " + datetime.now().ctime() + " end time " + str(end_time)
-#     save_name = save_name.replace(":","_")
-#
-#     ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-#     DATA_DIR = os.path.join(ROOT_DIR, save_name)
-#     os.mkdir(DATA_DIR)
-#     CSV_PATH = DATA_DIR + "//data"
-#
-#     with open(CSV_PATH, 'w', encoding='UTF8') as file:
-#         writer = csv.writer(file)
-#
-#
-#         for ax in f.get_axes():
-#             writer.writerow([ax.get_xlabel,ax.get_ylabel])
-#             for line in a2.lines:
-#                 d = line.get_label
-#                 writer.writerow([line.get_label])
-#                 x = line.get_xdata()
-#                 y = line.get_ydata()
-#                 for n in range(len(x)):
-#                     writer.writerow([x[n],y[n]])
-#
-#
-#     svg_file_name = DATA_DIR + "\\" + save_name + ".svg"
-#     f.savefig(svg_file_name)
+env = simpy.rt.RealtimeEnvironment(factor = 0.1, strict = False)
 
-
-env = simpy.rt.RealtimeEnvironment(factor=0.1, strict=False)
 
 env.process(create_clock(env))
 
