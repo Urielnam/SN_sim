@@ -31,7 +31,7 @@ def calc_self_org_over_time(self_organization_measure, env, dt, agent_flow_rates
 
 
 # calculate data type age over time (for a1).
-def calc_ages(image_map2, data_age_by_type, env, sensor_array_queue, array_analysis_queue, analysis_array_queue,
+def calc_ages(data_type_keys, data_age_by_type, env, sensor_array_queue, array_analysis_queue, analysis_array_queue,
               array_action_queue, action_array_queue, array_sensor_queue, data_age):
     # calculate average time for all objects.
 
@@ -44,7 +44,7 @@ def calc_ages(image_map2, data_age_by_type, env, sensor_array_queue, array_analy
     # in dict "data_age_by_type"
     # time now minus creation time.
     # for the list of object with that data type in all 6 arrays
-    for key in image_map2.keys():
+    for key in data_type_keys:
         data_age_by_type[key][float(env.now)].append(
             [env.now - data_object.time for data_object in [
                 i for i in (sensor_array_queue + array_analysis_queue + analysis_array_queue +
@@ -71,12 +71,12 @@ def calculate_number_of_objects(number_of_sensors, env, sensor_list, agent_flow_
 
 
 # accumulated function for all secondary calculation for the simulation.
-def clockanddatacalc_func(image_map2, data_age_by_type, env, sensor_array_queue, array_analysis_queue,
+def clockanddatacalc_func(data_type_keys, data_age_by_type, env, sensor_array_queue, array_analysis_queue,
                           analysis_array_queue, array_action_queue, action_array_queue, array_sensor_queue,
                           data_age, self_organization_measure, dt, agent_flow_rates_by_type, number_of_sensors,
                           successful_operations_total, successful_operations, sensor_list, array, analysis_station,
                           action_station, total_resource):
-    calc_ages(image_map2, data_age_by_type, env, sensor_array_queue, array_analysis_queue, analysis_array_queue,
+    calc_ages(data_type_keys, data_age_by_type, env, sensor_array_queue, array_analysis_queue, analysis_array_queue,
               array_action_queue, action_array_queue, array_sensor_queue, data_age)
     calc_self_org_over_time(self_organization_measure, env, dt, agent_flow_rates_by_type, number_of_sensors)
     calc_success_over_time(successful_operations_total, env, successful_operations, dt)

@@ -1,11 +1,9 @@
 import simpy
 import random
 
-import numpy as np
+
 from collections import defaultdict
-from datetime import datetime
-import os
-import csv
+
 import tkinter as tk
 
 from BackendClasses import clockanddatacalc_func
@@ -34,9 +32,9 @@ self_organization_measure = defaultdict(lambda: [])
 max_resource = 15
 end_time = 20
 
-# TODO: replace this
-ui = True
-UI_obj = {}
+# done: replace this to an external function
+# ui = False
+# UI_obj = {}
 # -------------------------
 # ANALYTICAL GLOBALS
 # -------------------------
@@ -95,15 +93,9 @@ static_image_map_keys = ["intel", "feedback", "target"]
 for key in static_image_map_keys:
     data_age_by_type[key] = defaultdict(lambda: [])
 
+data_type_keys = ["intel", "feedback", "target"]
 
-image_map2 = {
-    "intel": tk.PhotoImage(file="images/folder.png"),
-    "feedback": tk.PhotoImage(file="images/feedback.png"),
-    "target": tk.PhotoImage(file="images/target.png")
-}
-
-
-for key in image_map2.keys():
+for key in data_type_keys:
     data_age_by_type[key] = defaultdict(lambda: [])
 
 
@@ -117,73 +109,19 @@ regular_height = 30
 # Info is FIFO, so the function will need to delete the specific object and repaint. might need a loop.
 
 
-if ui:
-    UI_obj = UIClasses.PaintGrapic(
-            sensor_array_queue,
-            array_sensor_queue,
-            array_analysis_queue,
-            analysis_sublist,
-            analysis_array_queue,
-            array_action_queue,
-            action_array_queue)
-
-
-# sensor_list_visual = []
-
+# if ui:
+#     UI_obj = UIClasses.PaintGrapic(
+#             sensor_array_queue,
+#             array_sensor_queue,
+#             array_analysis_queue,
+#             analysis_sublist,
+#             analysis_array_queue,
+#             array_action_queue,
+#             action_array_queue)
 #
-# def paint_sensors():
-#     for i in sensor_list_visual:
-#         to_del = sensor_list_visual.pop()
-#         canvas.delete(to_del)
-#         canvas.update()
-#
-#     n = 1
-#
-#     for x in sensor_list:
-#
-#         element_name = x.name
-#         x_top = 5
-#         y_top = start_row + (regular_height+10)*(n-1)
-#         n = n + 1
-#         length = 60
-#         height = regular_height
-#
-#         sensor_list_visual.append(canvas.create_rectangle(x_top, y_top,
-#                                                           x_top + length,
-#                                                           y_top + height))
-#         sensor_list_visual.append(canvas.create_text(x_top + 10, y_top + 7,
-#                                                      anchor = tk.NW,
-#                                                      text = f"{element_name}"))
-#         canvas.update()
-#
-
-# def calc_self_org(dt):
-#     changes_by_key = []
-#
-#     for key_n in agent_flow_rates_by_type.keys():
-#         change_count = 0
-#         relevant_list_of_timesteps_keys = [x for x in agent_flow_rates_by_type[key_n].keys() if x > (env.now - dt)]
-#         for x in range(len(relevant_list_of_timesteps_keys) - 1):
-#             if agent_flow_rates_by_type[key_n][relevant_list_of_timesteps_keys[x]] != \
-#                     agent_flow_rates_by_type[key_n][relevant_list_of_timesteps_keys[x + 1]]:
-#                 change_count += 1
-#         changes_by_key.append(change_count)
-#
-#     change_count = 0
-#     relevant_list_of_timesteps = [x for x in number_of_sensors.keys() if x > (env.now - dt)]
-#     for x in range(len(relevant_list_of_timesteps) - 1):
-#         if number_of_sensors[relevant_list_of_timesteps[x]] != \
-#                 number_of_sensors[relevant_list_of_timesteps[x + 1]]:
-#             change_count += 1
-#     changes_by_key.append(change_count)
-#
-#     return np.sum(changes_by_key)
-
-
-
-clock = UIClasses.ClockAndDataDraw(1100, 260, 1290, 340, 0, sensor_list, data_age, data_age_by_type,
-                                   successful_operations_total, number_of_sensors, agent_flow_rates_by_type,
-                                   total_resource, self_organization_measure)
+#     clock = UIClasses.ClockAndDataDraw(1100, 260, 1290, 340, 0, sensor_list, data_age, data_age_by_type,
+#                                        successful_operations_total, number_of_sensors, agent_flow_rates_by_type,
+#                                        total_resource, self_organization_measure)
 
 
 #
@@ -192,13 +130,13 @@ clock = UIClasses.ClockAndDataDraw(1100, 260, 1290, 340, 0, sensor_list, data_ag
 # -------------------------
 
 
-def create_clock(env):
+def create_clock(env, array, analysis_station, action_station, ui, clock, UI_obj):
     # This generator is meant to be used as a SimPy event to update the clock and the data in the UI
 
     while True:
         yield env.timeout(0.1)
         dt = 5
-        clockanddatacalc_func(image_map2, data_age_by_type, env, sensor_array_queue, array_analysis_queue,
+        clockanddatacalc_func(data_type_keys, data_age_by_type, env, sensor_array_queue, array_analysis_queue,
                               analysis_array_queue, array_action_queue, action_array_queue, array_sensor_queue,
                               data_age, self_organization_measure, dt, agent_flow_rates_by_type, number_of_sensors,
                               successful_operations_total, successful_operations, sensor_list, array, analysis_station,
@@ -207,7 +145,6 @@ def create_clock(env):
         if ui:
             clock.tick(env.now)
             UI_obj.tick()
-
 
 
 # Intel object. Has a real/wrong status and time created
@@ -228,9 +165,9 @@ class Data:
 # Intel generated is randomly selected to be true or false with a certain precentage.
 
 class Sensor(object):
-    def __init__(self, correctness_probability, order):
-        self.env = env
-        self.action = env.process(self.run())
+    def __init__(self, correctness_probability, order, external_environemnt):
+        self.env = external_environemnt
+        self.action = self.env.process(self.run())
         self.correctness_probability = correctness_probability
         self.order = order
         self.name = "Sensor " + str(order)
@@ -240,32 +177,33 @@ class Sensor(object):
         while self.is_alive:
 
             # print('Create new info bit at time %d' % env.now)
-            yield env.timeout(1)
+            yield self.env.timeout(1)
             sensor_array_queue.append(Data(random.random() < self.correctness_probability,
-                                           env.now, 'intel', self.name))
+                                           self.env.now, 'intel', self.name))
 
 
 # The array moves data between different queues. It can move only one object per lane.
 class Array(object):
-    def __init__(self):
-        self.env = env
-        self.action = env.process(self.run())
+    def __init__(self, external_environemnt, ui_flag):
+        self.env = external_environemnt
+        self.action = self.env.process(self.run())
+        self.ui_flag = ui_flag
 
         self.flow_rate = 1
 
-        if ui:
+        if ui_flag:
             self.arr = UIClasses.ArrayDraw()
 
     def move_item(self, queue_from, queue_to):
         moved_item = queue_from[0]
         queue_from.pop(0)
         # # draw inside box
-        if ui:
+        if self.ui_flag:
             self.arr.arr_move_item(moved_item)
 
-        yield env.timeout(1/self.flow_rate)
+        yield self.env.timeout(1/self.flow_rate)
 
-        if ui:
+        if self.ui_flag:
             self.arr.arr_clear_item()
             
         queue_to.append(moved_item)
@@ -277,7 +215,7 @@ class Array(object):
             # for each lane, move one data unit per time
             for i in range(self.flow_rate):
                 if check_queue() == 0:
-                    yield env.timeout(1)
+                    yield self.env.timeout(1)
                     break
                 selected_array = random.choice([x for x in start_nodes.keys() if len(start_nodes[x]) > 0])
                 second_array = connecting_graph[selected_array][start_nodes[selected_array][0].type]
@@ -292,12 +230,12 @@ def check_queue():
 # if one of the intel is true, the intel is correct and the boogie is found. if both are false, the attack failes.
 # I need to change it so it ingests one intel article per cycle.
 class AnalysisStation(object):
-    def __init__(self):
-        self.env = env
-        self.action = env.process(self.run())
-
+    def __init__(self, external_environemnt, ui_flag):
+        self.env = external_environemnt
+        self.action = external_environemnt.process(self.run())
+        self.ui_flag = ui_flag
         self.flow_rate = 1
-        if ui:
+        if ui_flag:
             self.draw = UIClasses.AnalysisStationDraw()
 
     def run(self):
@@ -308,19 +246,19 @@ class AnalysisStation(object):
             bank_size = 2
 
             if len(array_analysis_queue) == 0:
-                yield env.timeout(1)
+                yield self.env.timeout(1)
 
             else:
                 moved_item = array_analysis_queue[0]
                 array_analysis_queue.pop(0)
-                analysis_data_usage_time.append(env.now - moved_item.time)
+                analysis_data_usage_time.append(self.env.now - moved_item.time)
 
-                if ui:
+                if self.ui_flag:
                     self.draw.run_draw(moved_item)
 
-                yield env.timeout(1/self.flow_rate)
+                yield self.env.timeout(1/self.flow_rate)
 
-                if ui:
+                if self.ui_flag:
                     self.draw.run_delete()
 
                 if moved_item.type == 'feedback':
@@ -335,16 +273,17 @@ class AnalysisStation(object):
                     if len(analysis_sublist) == bank_size:
 
                         analysis_array_queue.append(Data(analysis_sublist[0].status or analysis_sublist[1].status,
-                                                         env.now, 'target', random.choice(analysis_sublist).creator))
+                                                         self.env.now, 'target',
+                                                         random.choice(analysis_sublist).creator))
                         analysis_sublist.pop(0)
                         analysis_sublist.pop(0)
 
 
 # action_station acts when there is intel in the pipeline
 class ActionStation(object):
-    def __init__(self, env):
-        self.env = env
-        self.action = env.process(self.run())
+    def __init__(self, external_environemnt):
+        self.env = external_environemnt
+        self.action = self.env.process(self.run())
         self.flow_rate = 1
 
     def run(self):
@@ -359,27 +298,26 @@ class ActionStation(object):
                 if a.status:
                     print("Attack successful!")
                     # send back positive feedback
-                    action_array_queue.append(Data(True, env.now,
+                    action_array_queue.append(Data(True, self.env.now,
                                                    'feedback', a.creator))
                     successful_operations.append(self.env.now)
                 if not a.status:
                     print("Attack failed")
                     # send back negative feedback
-                    action_array_queue.append(Data(False, env.now,
+                    action_array_queue.append(Data(False, self.env.now,
                                                    'feedback', a.creator))
 
             else:
                 yield self.env.timeout(1)
 
 
-
-def check_max_resource():
+def check_max_resource(array, analysis_station, action_station):
     return(len(sensor_list)+array.flow_rate +
            analysis_station.flow_rate +
            action_station.flow_rate) < max_resource
 
 
-def sensor_maker(env):
+def sensor_maker(external_environemnt, array, analysis_station, action_station):
     sensor_number = 2
 
     while True:
@@ -388,8 +326,8 @@ def sensor_maker(env):
             # if action feedback is good, create new sensor and kill the data.
             if array_sensor_queue[0].status:
                 a = random.random()
-                if check_max_resource():
-                    sensor_list.append(Sensor(a, sensor_number))
+                if check_max_resource(array, analysis_station, action_station):
+                    sensor_list.append(Sensor(a, sensor_number, external_environemnt))
                     sensor_number = sensor_number + 1
                 array_sensor_queue.pop(0)
             else:
@@ -400,44 +338,44 @@ def sensor_maker(env):
                         sensor_list.remove(sensor)
                 if len(sensor_list) == 0:
                     a = random.random()
-                    sensor_list.append(Sensor(a, sensor_number))
+                    sensor_list.append(Sensor(a, sensor_number, external_environemnt))
                     sensor_number = sensor_number + 1
                 array_sensor_queue.pop(0)
-        if not check_max_resource() and len(sensor_list) > 1:
+        if not check_max_resource(array, analysis_station, action_station) and len(sensor_list) > 1:
             x = random.choice(sensor_list)
             x.is_alive = False
             sensor_list.remove(x)
 
-        yield env.timeout(0.1)
+        yield external_environemnt.timeout(0.1)
 
 
-def array_upgrade(env, array):
+def array_upgrade(env, array, analysis_station, action_station):
     while True:
         if check_queue() < (array.flow_rate-1)*5 and array.flow_rate > 1:
             array.flow_rate = array.flow_rate - 1
-        if check_max_resource():
+        if check_max_resource(array, analysis_station, action_station):
             while check_queue() > array.flow_rate*5:
                 array.flow_rate = array.flow_rate + 1
         yield env.timeout(0.1)
 
 
-def analysis_upgrade(env, analysis):
+def analysis_upgrade(env, analysis_station, array, action_station):
     while True:
-        if len(array_analysis_queue) < (analysis.flow_rate-1)*5 and analysis.flow_rate > 1:
-            analysis.flow_rate = analysis.flow_rate - 1
-        if check_max_resource():
-            while len(array_analysis_queue) > analysis.flow_rate*5:
-                analysis.flow_rate = analysis.flow_rate + 1
+        if len(array_analysis_queue) < (analysis_station.flow_rate-1)*5 and analysis_station.flow_rate > 1:
+            analysis_station.flow_rate = analysis_station.flow_rate - 1
+        if check_max_resource(array, analysis_station, action_station):
+            while len(array_analysis_queue) > analysis_station.flow_rate*5:
+                analysis_station.flow_rate = analysis_station.flow_rate + 1
         yield env.timeout(0.1)
 
 
-def action_upgrade(env, action):
+def action_upgrade(env, action_station, array, analysis_station):
     while True:
-        if len(array_action_queue) < (action.flow_rate-1)*5 and action.flow_rate > 1:
-            action.flow_rate = action.flow_rate - 1
-        if check_max_resource():
-                while len(array_action_queue) > action.flow_rate*5:
-                    action.flow_rate = action.flow_rate + 1
+        if len(array_action_queue) < (action_station.flow_rate - 1)*5 and action_station.flow_rate > 1:
+            action_station.flow_rate = action_station.flow_rate - 1
+        if check_max_resource(array, analysis_station, action_station):
+            while len(array_action_queue) > action_station.flow_rate*5:
+                action_station.flow_rate = action_station.flow_rate + 1
         yield env.timeout(1.1)
 
 
@@ -445,29 +383,47 @@ def action_upgrade(env, action):
 # data to include
 # all plotted data - need to check how it's done maybe?
 
+def main_run(ui):
+    clock = {}
+    UI_obj = {}
 
-env = simpy.rt.RealtimeEnvironment(factor = 0.1, strict = False)
+    if ui:
+        UI_obj = UIClasses.PaintGrapic(
+            sensor_array_queue,
+            array_sensor_queue,
+            array_analysis_queue,
+            analysis_sublist,
+            analysis_array_queue,
+            array_action_queue,
+            action_array_queue)
 
+        clock = UIClasses.ClockAndDataDraw(1100, 260, 1290, 340, 0, sensor_list, data_age, data_age_by_type,
+                                           successful_operations_total, number_of_sensors, agent_flow_rates_by_type,
+                                           total_resource, self_organization_measure)
 
-env.process(create_clock(env))
+    env = simpy.rt.RealtimeEnvironment(factor=0.1, strict=False)
+    # do not remove, it's a faster env function:
+    # env = simpy.Environment()
 
-# env = simpy.Environment()
-action_station = ActionStation(env)
-analysis_station = AnalysisStation()
+    array = Array(env, ui)
+    action_station = ActionStation(env)
+    analysis_station = AnalysisStation(env, ui)
+    env.process(create_clock(env, array, analysis_station, action_station, ui, clock, UI_obj))
 
-array = Array()
-sensor_list.append(Sensor(0.5, 1))
-env.process(sensor_maker(env))
-env.process(array_upgrade(env, array))
-env.process(analysis_upgrade(env, analysis_station))
-env.process(action_upgrade(env, action_station))
-env.process(UIClasses.save_graph(env, end_time))
+    sensor_list.append(Sensor(0.5, 1, env))
+    env.process(sensor_maker(env, array, analysis_station, action_station))
+    env.process(array_upgrade(env, array, analysis_station, action_station))
+    env.process(analysis_upgrade(env, analysis_station, array, action_station))
+    env.process(action_upgrade(env, action_station, array, analysis_station))
+    env.process(UIClasses.save_graph(env, end_time))
 
-env.run(until=end_time)
+    env.run(until=end_time)
 
-UIClasses.main.mainloop()
+    if ui:
+        UIClasses.main.mainloop()
 
-
+    return [data_age, data_age_by_type, successful_operations_total, number_of_sensors, agent_flow_rates_by_type,
+            total_resource, self_organization_measure]
 
 
 
