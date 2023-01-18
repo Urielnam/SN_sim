@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from datetime import datetime
 import numpy as np
+import pandas as pd
 
 import os
 import csv
@@ -291,26 +292,50 @@ class AnalysisStationDraw:
 def save_graph(env, end_time):
     yield env.timeout(end_time-0.1)
     save_name = "self org plot " + datetime.now().ctime() + " end time " + str(end_time)
-    save_name = save_name.replace(":","_")
+    save_name = save_name.replace(":", "_")
 
-    ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-    DATA_DIR = os.path.join(ROOT_DIR, save_name)
-    os.mkdir(DATA_DIR)
+    DATA_DIR = create_folder(save_name)
+    # ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+    # DATA_DIR = os.path.join(ROOT_DIR, save_name)
+    # os.mkdir(DATA_DIR)
+
     CSV_PATH = DATA_DIR + "//data"
 
     with open(CSV_PATH, 'w', encoding='UTF8') as file:
         writer = csv.writer(file)
 
         for ax in f.get_axes():
-            writer.writerow([ax.get_xlabel,ax.get_ylabel])
+            writer.writerow([ax.get_xlabel, ax.get_ylabel])
             for line in a2.lines:
                 d = line.get_label
                 writer.writerow([line.get_label])
                 x = line.get_xdata()
                 y = line.get_ydata()
                 for n in range(len(x)):
-                    writer.writerow([x[n],y[n]])
+                    writer.writerow([x[n], y[n]])
 
     svg_file_name = DATA_DIR + "\\" + save_name + ".svg"
     f.savefig(svg_file_name)
+
+
+def print_to_file(simulation_collector):
+    # convert into dataframe
+    dir = create_folder("excels")
+    for key in simulation_collector:
+        df = pd.DataFrame(data=simulation_collector[key])
+        # df = df.T
+        # convert into excel
+        excel_name = dir + "\\" + key + ".xlsx"
+        df.to_excel(excel_name, index=False)
+
+
+def create_folder(name):
+    ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+    DATA_DIR = os.path.join(ROOT_DIR, name)
+
+    #check if dir exists - if not: create
+    if not os.path.exists(DATA_DIR):
+        os.mkdir(DATA_DIR)
+
+    return DATA_DIR
 

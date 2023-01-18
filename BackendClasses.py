@@ -83,5 +83,3 @@ def clockanddatacalc_func(data_type_keys, data_age_by_type, env, sensor_array_qu
     calculate_number_of_objects(number_of_sensors, env, sensor_list, agent_flow_rates_by_type, array, analysis_station,
                                 action_station, total_resource)
 
-
-

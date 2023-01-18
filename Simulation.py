@@ -6,6 +6,7 @@ from collections import defaultdict
 
 import tkinter as tk
 
+import BackendClasses
 from BackendClasses import clockanddatacalc_func
 import UIClasses
 # -------------------------
@@ -383,7 +384,7 @@ def action_upgrade(env, action_station, array, analysis_station):
 # data to include
 # all plotted data - need to check how it's done maybe?
 
-def main_run(ui):
+def main_run(ui, print_excel):
     clock = {}
     UI_obj = {}
 
@@ -421,10 +422,19 @@ def main_run(ui):
 
     if ui:
         UIClasses.main.mainloop()
+    simulation_collector = {
+        "data_age": data_age,
+        "data_age_by_type": data_age_by_type,
+        "successful_operations_total": successful_operations_total,
+        "number_of_sensors": number_of_sensors,
+        "agent_flow_rates_by_type": agent_flow_rates_by_type,
+        "total_resource": total_resource,
+        "self_organization_measure": self_organization_measure
+    }
 
-    return [data_age, data_age_by_type, successful_operations_total, number_of_sensors, agent_flow_rates_by_type,
-            total_resource, self_organization_measure]
-
+    if print_excel:
+        UIClasses.print_to_file(simulation_collector)
+    return simulation_collector
 
 
 

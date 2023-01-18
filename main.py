@@ -7,18 +7,14 @@ starts file Simulation.py
 import Simulation
 import PlotClasses
 
+ui = False
+print_excel = True
 # TODO create a function to analyze the proportions between self - org and accumulated success.
 # TODO stack it so we can run the simulation multiple times and then show the self-org/accumulated success for each
 #  seperatly and togther
-simulation_collector = Simulation.main_run(False)
+simulation_collector = Simulation.main_run(ui, print_excel)
 
 
-PlotClasses.paintfinal(simulation_collector[0],
-                           simulation_collector[1],
-                           simulation_collector[2],
-                           simulation_collector[3],
-                           simulation_collector[4],
-                           simulation_collector[5],
-                           simulation_collector[6], dt=5)
+PlotClasses.paintfinal(simulation_collector, dt=5)
 
 # f.show()
