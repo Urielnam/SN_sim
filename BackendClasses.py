@@ -1,4 +1,5 @@
 import numpy as np
+from statistics import mean, stdev
 
 
 def calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env):
@@ -84,4 +85,32 @@ def clockanddatacalc_func(data_type_keys, data_age_by_type, env, sensor_array_qu
                                 action_station, total_resource)
 
 
+def calc_average_stdev(success_vs_self_org_dict):
+    for self_org_key in success_vs_self_org_dict:
+        success_vs_self_org_dict[self_org_key]["average"]= mean(success_vs_self_org_dict[self_org_key]["values"])
+        success_vs_self_org_dict[self_org_key]["stdev"] = stdev(success_vs_self_org_dict[self_org_key]["values"])
+
+
+# function that gets as input a graph of self-organization over time, and a graph of success over time and calculates
+# the average success over time for a specific value of self-org with stdev.
+# create a matrix of self-organization vs success over time
+def calc_success_vs_self_org(self_organization_measure_dict, successful_operations_total_dict):
+    success_vs_self_org_dict = {}
+
+    for key in self_organization_measure_dict:
+
+        self_org_key = self_organization_measure_dict[key][0]
+        successful_op_value = successful_operations_total_dict[key][0]
+        if self_org_key not in success_vs_self_org_dict:
+            success_vs_self_org_dict[self_org_key] = {"values" : []}
+        success_vs_self_org_dict[self_org_key]["values"].append(successful_op_value)
+
+        # success_vs_self_org_dict[0].append(successful_operations_total_dict[timestep])
+        # success_vs_self_org_dict[1].append(self_organization_measure_dict[timestep])
+        # success_vs_self_org_dict[2].append(timestep)
+
+    return success_vs_self_org_dict
+
+
+    None
 
