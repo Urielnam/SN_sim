@@ -16,8 +16,7 @@ a2 = f.add_subplot(224)
 a2.plot()
 
 
-def paintfinal(data_age, data_age_by_type, successful_operations_total, number_of_sensors, agent_flow_rates_by_type,
-               total_resource, self_organization_measure, dt):
+def paintfinal(simulation_collector, dt):
 
     # data_plot = FigureCanvasTkAgg(f, master=main)
     # data_plot.get_tk_widget().config(height=400)
@@ -37,39 +36,38 @@ def paintfinal(data_age, data_age_by_type, successful_operations_total, number_o
     a1.set_xlabel("Time")
     a1.set_ylabel("Average Data Age")
 
-    a1.plot([t for (t, age) in data_age.items()], [np.mean(age) for (t, age) in data_age.items()],
-                label="all")
+    a1.plot([t for (t, age) in simulation_collector['data_age'].items()],
+            [np.mean(age) for (t, age) in simulation_collector['data_age'].items()], label="all")
 
     for key in data_type_keys:
-        a1.plot([t for (t, age) in data_age_by_type[key].items()],
-                [np.mean(age) for (t, age) in data_age_by_type[key].items()], label = key)
+        a1.plot([t for (t, age) in simulation_collector['data_age_by_type'][key].items()],
+                [np.mean(age) for (t, age) in simulation_collector['data_age_by_type'][key].items()], label=key)
     a1.legend(loc="upper left")
-
-
 
     a2.cla()
     a2.set_xlabel("Time")
     a2.set_ylabel("Accumulated Success")
-   # code to calculate step function.
+
+    # code to calculate step function.
     # successful_operations_total[float(env.now)].append(len([x for x in successful_operations if x > env.now - dt]))
-    a2.plot([t for (t, success) in successful_operations_total.items()],
-            [success for (t, success) in successful_operations_total.items()],
+    a2.plot([t for (t, success) in simulation_collector['successful_operations_total'].items()],
+            [success for (t, success) in simulation_collector['successful_operations_total'].items()],
             label="Average success over last " + str(dt) + " timesteps")
 
     a3.cla()
     a3.set_xlabel("Time")
     a3.set_ylabel("System Cost")
 
-    a3.plot([t for (t, a) in number_of_sensors.items()],
-            [a for (t, a) in number_of_sensors.items()],
+    a3.plot([t for (t, a) in simulation_collector['number_of_sensors'].items()],
+            [a for (t, a) in simulation_collector['number_of_sensors'].items()],
             label="Sensors")
 
-    for key in agent_flow_rates_by_type.keys():
-        a3.plot([t for (t, a) in agent_flow_rates_by_type[key].items()],
-                [a for (t, a) in agent_flow_rates_by_type[key].items()],
+    for key in simulation_collector['agent_flow_rates_by_type'].keys():
+        a3.plot([t for (t, a) in simulation_collector['agent_flow_rates_by_type'][key].items()],
+                [a for (t, a) in simulation_collector['agent_flow_rates_by_type'][key].items()],
                 label=key)
-    a3.plot([t for (t, a) in total_resource.items()],
-            [a for (t, a) in total_resource.items()],
+    a3.plot([t for (t, a) in simulation_collector['total_resource'].items()],
+            [a for (t, a) in simulation_collector['total_resource'].items()],
             label="Total")
 
     a3.legend(loc="upper left")
@@ -78,9 +76,8 @@ def paintfinal(data_age, data_age_by_type, successful_operations_total, number_o
     # "in motion" for the last X timesteps.
     # sum of number of times the resources were re-allocated.
 
-
-    a2.plot([t for (t, a) in self_organization_measure.items()],
-            [a for (t, a) in self_organization_measure.items()],
+    a2.plot([t for (t, a) in simulation_collector['self_organization_measure'].items()],
+            [a for (t, a) in simulation_collector['self_organization_measure'].items()],
             label="Self-organization effort over last " + str(dt) + " timesteps")
 
     a2.legend(loc="upper left")
