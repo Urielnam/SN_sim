@@ -1,11 +1,10 @@
 import tkinter as tk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from datetime import datetime
 import numpy as np
-
-import os
 import csv
+import os
+
 
 main = tk.Tk()
 main.title("ISR Simulation")
@@ -74,7 +73,6 @@ class IsrElement:
         canvas.create_rectangle(x_top, y_top, x_top + length, y_top + height)
         canvas.create_text(x_top + 10, y_top + 7, anchor=tk.NW, text=f"{element_name}")
         self.canvas.update()
-
 
 
 class QueueGraphics:
@@ -288,29 +286,54 @@ class AnalysisStationDraw:
             canvas.update()
 
 
-def save_graph(env, end_time):
+def save_graph(env, end_time, now):
     yield env.timeout(end_time-0.1)
-    save_name = "self org plot " + datetime.now().ctime() + " end time " + str(end_time)
-    save_name = save_name.replace(":","_")
 
-    ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-    DATA_DIR = os.path.join(ROOT_DIR, save_name)
-    os.mkdir(DATA_DIR)
+    save_name = "self_org_plot end_time_" + str(end_time)
+
+    DATA_DIR = create_folder(save_name, now)
+
     CSV_PATH = DATA_DIR + "//data"
 
     with open(CSV_PATH, 'w', encoding='UTF8') as file:
         writer = csv.writer(file)
 
         for ax in f.get_axes():
-            writer.writerow([ax.get_xlabel,ax.get_ylabel])
+            writer.writerow([ax.get_xlabel, ax.get_ylabel])
             for line in a2.lines:
                 d = line.get_label
                 writer.writerow([line.get_label])
                 x = line.get_xdata()
                 y = line.get_ydata()
                 for n in range(len(x)):
-                    writer.writerow([x[n],y[n]])
+                    writer.writerow([x[n], y[n]])
 
     svg_file_name = DATA_DIR + "\\" + save_name + ".svg"
     f.savefig(svg_file_name)
 
+
+
+def create_folder(name, now):
+
+    # name = "sim_data\\"+now+"\\"+name
+
+    ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+    top_folder = os.path.join(ROOT_DIR, "sim_data")
+    create_folder_path(top_folder)
+
+    date_folder = os.path.join(top_folder, now)
+    create_folder_path(date_folder)
+
+    DATA_DIR = os.path.join(date_folder, name)
+    create_folder_path(DATA_DIR)
+    # #check if dir exists - if not: create
+    # if not os.path.exists(DATA_DIR):
+    #     os.mkdir(DATA_DIR)
+
+    return DATA_DIR
+
+def create_folder_path(path):
+
+    if not os.path.exists(path):
+        os.mkdir(path)
