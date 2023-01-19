@@ -1,12 +1,10 @@
 import tkinter as tk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from datetime import datetime
 import numpy as np
-import pandas as pd
-
-import os
 import csv
+import os
+
 
 main = tk.Tk()
 main.title("ISR Simulation")
@@ -289,15 +287,12 @@ class AnalysisStationDraw:
             canvas.update()
 
 
-def save_graph(env, end_time):
+def save_graph(env, end_time, now):
     yield env.timeout(end_time-0.1)
-    save_name = "self org plot " + datetime.now().ctime() + " end time " + str(end_time)
-    save_name = save_name.replace(":", "_")
 
-    DATA_DIR = create_folder(save_name)
-    # ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-    # DATA_DIR = os.path.join(ROOT_DIR, save_name)
-    # os.mkdir(DATA_DIR)
+    save_name = "self_org_plot end_time_" + str(end_time)
+
+    DATA_DIR = create_folder(save_name, now)
 
     CSV_PATH = DATA_DIR + "//data"
 
@@ -318,24 +313,28 @@ def save_graph(env, end_time):
     f.savefig(svg_file_name)
 
 
-def print_to_file(simulation_collector):
-    # convert into dataframe
-    dir = create_folder("excels")
-    for key in simulation_collector:
-        df = pd.DataFrame(data=simulation_collector[key])
-        # df = df.T
-        # convert into excel
-        excel_name = dir + "\\" + key + ".xlsx"
-        df.to_excel(excel_name, index=False)
 
+def create_folder(name, now):
 
-def create_folder(name):
+    # name = "sim_data\\"+now+"\\"+name
+
     ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-    DATA_DIR = os.path.join(ROOT_DIR, name)
 
-    #check if dir exists - if not: create
-    if not os.path.exists(DATA_DIR):
-        os.mkdir(DATA_DIR)
+    top_folder = os.path.join(ROOT_DIR, "sim_data")
+    create_folder_path(top_folder)
+
+    date_folder = os.path.join(top_folder, now)
+    create_folder_path(date_folder)
+
+    DATA_DIR = os.path.join(date_folder, name)
+    create_folder_path(DATA_DIR)
+    # #check if dir exists - if not: create
+    # if not os.path.exists(DATA_DIR):
+    #     os.mkdir(DATA_DIR)
 
     return DATA_DIR
 
+def create_folder_path(path):
+
+    if not os.path.exists(path):
+        os.mkdir(path)

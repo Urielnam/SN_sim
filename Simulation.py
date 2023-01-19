@@ -1,6 +1,9 @@
 import simpy
 import random
+import pandas as pd
+from datetime import datetime
 
+import os
 
 from collections import defaultdict
 
@@ -102,6 +105,8 @@ for key in data_type_keys:
 
 start_row = 95
 regular_height = 30
+now = datetime.now().ctime()
+now = now.replace(":", "_")
 
 # the queue graphics manage the location and order of painting stuff but the icon needs to come for the data piece
 # itself whether it's intel, analysis etc.
@@ -416,7 +421,7 @@ def main_run(ui, print_excel):
     env.process(array_upgrade(env, array, analysis_station, action_station))
     env.process(analysis_upgrade(env, analysis_station, array, action_station))
     env.process(action_upgrade(env, action_station, array, analysis_station))
-    env.process(UIClasses.save_graph(env, end_time))
+    env.process(UIClasses.save_graph(env, end_time, now))
 
     env.run(until=end_time)
 
@@ -433,9 +438,19 @@ def main_run(ui, print_excel):
     }
 
     if print_excel:
-        UIClasses.print_to_file(simulation_collector)
+        print_to_file(simulation_collector)
     return simulation_collector
 
+
+def print_to_file(simulation_collector):
+    # convert into dataframe
+    path = UIClasses.create_folder("excels", now)
+    for val in simulation_collector:
+        df = pd.DataFrame(data=simulation_collector[val])
+        # df = df.T
+        # convert into excel
+        excel_name = path + "\\" + val + ".xlsx"
+        df.to_excel(excel_name, index=False)
 
 
 
