@@ -105,12 +105,6 @@ def calc_success_vs_self_org(self_organization_measure_dict, successful_operatio
             success_vs_self_org_dict[self_org_key] = {"values" : []}
         success_vs_self_org_dict[self_org_key]["values"].append(successful_op_value)
 
-        # success_vs_self_org_dict[0].append(successful_operations_total_dict[timestep])
-        # success_vs_self_org_dict[1].append(self_organization_measure_dict[timestep])
-        # success_vs_self_org_dict[2].append(timestep)
-
     return success_vs_self_org_dict
 
-
-    None
 
