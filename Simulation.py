@@ -390,6 +390,8 @@ def action_upgrade(env, action_station, array, analysis_station):
 # all plotted data - need to check how it's done maybe?
 
 def main_run(ui, print_excel):
+    # declare all required dictionaries so they can be deleted at the end of the run
+
     clock = {}
     UI_obj = {}
 

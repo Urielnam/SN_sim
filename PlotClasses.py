@@ -7,16 +7,25 @@ import matplotlib.pyplot as plt
 import numpy as np
 from Simulation import data_type_keys
 
-f = plt.figure(figsize=(2, 2), dpi=72)
-a3 = f.add_subplot(121)
-a3.plot()
-a1 = f.add_subplot(222)
-a1.plot()
-a2 = f.add_subplot(224)
-a2.plot()
+# f = plt.figure(figsize=(2, 2), dpi=72)
+# a3 = f.add_subplot(121)
+# a3.plot()
+# a1 = f.add_subplot(222)
+# a1.plot()
+# a2 = f.add_subplot(224)
+# a2.plot()
 
 
+# draw the graph for a single run.
 def paintfinal(simulation_collector, dt):
+
+    f = plt.figure(figsize=(2, 2), dpi=72)
+    a3 = f.add_subplot(121)
+    a3.plot()
+    a1 = f.add_subplot(222)
+    a1.plot()
+    a2 = f.add_subplot(224)
+    a2.plot()
 
     # data_plot = FigureCanvasTkAgg(f, master=main)
     # data_plot.get_tk_widget().config(height=400)
