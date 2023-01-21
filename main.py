@@ -16,7 +16,7 @@ simulation_collector = {}
 
 # TODO stack it so we can run the simulation multiple times and then show the self-org/accumulated success for each
 #  separately and together
-for i in range(1):
+for i in range(2):
     simulation_collector["run #" + str(i)] = Simulation.main_run(ui, print_excel)
 
     success_vs_self_org_dict = BackendClasses.calc_success_vs_self_org(
@@ -26,7 +26,7 @@ for i in range(1):
 # function to analyze the proportions between self - org and accumulated success.
 BackendClasses.calc_average_stdev(success_vs_self_org_dict)
 # currently a function showing only one run. I want a function to stack different runs.
-PlotClasses.paintfinal(simulation_collector, dt=5)
+# PlotClasses.paintfinal(simulation_collector["run #" + str(0)], dt=5)
 UIClasses.plot_self_org_success_with_error(success_vs_self_org_dict)
 
 
