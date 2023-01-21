@@ -8,18 +8,21 @@ import Simulation
 import PlotClasses
 import BackendClasses
 import UIClasses
-
+import multiprocessing
 
 ui = False
 print_excel = False
-end_time = 100
+end_time = 1000
+number_of_iterations = 6
 
 simulation_collector = {}
 success_vs_self_org_dict = {}
 success_vs_self_org_dict["total"] = {}
-# TODO stack it so we can run the simulation multiple times and then show the self-org/accumulated success for each
-#  separately and together
-for i in range(3):
+# we can run the simulation multiple times and then show the self-org/accumulated success for each
+# separately and together
+
+# TODO add multiprocessing support
+for i in range(number_of_iterations):
     simulation_collector["run #" + str(i)] = Simulation.main_run(ui, print_excel, end_time)
 
     success_vs_self_org_dict["run #" + str(i)] = BackendClasses.calc_success_vs_self_org(
