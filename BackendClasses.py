@@ -88,7 +88,10 @@ def clockanddatacalc_func(data_type_keys, data_age_by_type, env, sensor_array_qu
 def calc_average_stdev(success_vs_self_org_dict):
     for self_org_key in success_vs_self_org_dict:
         success_vs_self_org_dict[self_org_key]["average"]= mean(success_vs_self_org_dict[self_org_key]["values"])
-        success_vs_self_org_dict[self_org_key]["stdev"] = stdev(success_vs_self_org_dict[self_org_key]["values"])
+        if len(success_vs_self_org_dict[self_org_key]["values"])>1:
+            success_vs_self_org_dict[self_org_key]["stdev"] = stdev(success_vs_self_org_dict[self_org_key]["values"])
+        else:
+            success_vs_self_org_dict[self_org_key]["stdev"] = 0
 
 
 # function that gets as input a graph of self-organization over time, and a graph of success over time and calculates

@@ -12,6 +12,7 @@ import UIClasses
 
 ui = False
 print_excel = False
+end_time = 100
 
 simulation_collector = {}
 success_vs_self_org_dict = {}
@@ -19,7 +20,7 @@ success_vs_self_org_dict["total"] = {}
 # TODO stack it so we can run the simulation multiple times and then show the self-org/accumulated success for each
 #  separately and together
 for i in range(3):
-    simulation_collector["run #" + str(i)] = Simulation.main_run(ui, print_excel)
+    simulation_collector["run #" + str(i)] = Simulation.main_run(ui, print_excel, end_time)
 
     success_vs_self_org_dict["run #" + str(i)] = BackendClasses.calc_success_vs_self_org(
         simulation_collector["run #" + str(i)]["self_organization_measure"],

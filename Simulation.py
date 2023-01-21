@@ -29,7 +29,7 @@ class Data:
 # data to include
 # all plotted data - need to check how it's done maybe?
 
-def main_run(ui, print_excel):
+def main_run(ui, print_excel, end_time):
     # declare all required dictionaries so they can be deleted at the end of the run
 
     # -------------------------
@@ -48,7 +48,7 @@ def main_run(ui, print_excel):
     total_resource = defaultdict(lambda: [])
     self_organization_measure = defaultdict(lambda: [])
     max_resource = 15
-    end_time = 20
+    # end_time = 20
 
     # done: replace this to an external function
     # ui = False
