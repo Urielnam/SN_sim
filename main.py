@@ -14,6 +14,7 @@ ui = False
 print_excel = False
 end_time = 1000
 number_of_iterations = 6
+max_resource = 100
 
 simulation_collector = {}
 success_vs_self_org_dict = {}
@@ -23,7 +24,7 @@ success_vs_self_org_dict["total"] = {}
 
 # TODO add multiprocessing support
 for i in range(number_of_iterations):
-    simulation_collector["run #" + str(i)] = Simulation.main_run(ui, print_excel, end_time)
+    simulation_collector["run #" + str(i)] = Simulation.main_run(ui, print_excel, end_time, max_resource)
 
     success_vs_self_org_dict["run #" + str(i)] = BackendClasses.calc_success_vs_self_org(
         simulation_collector["run #" + str(i)]["self_organization_measure"],
