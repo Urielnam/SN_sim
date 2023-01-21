@@ -17,7 +17,7 @@ from Simulation import data_type_keys
 
 
 # draw the graph for a single run.
-def paintfinal(simulation_collector, dt):
+def paint_final(simulation_collector, dt):
 
     f = plt.figure(figsize=(2, 2), dpi=72)
     a3 = f.add_subplot(121)
