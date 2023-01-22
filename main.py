@@ -20,7 +20,6 @@ number_of_iterations = 3
 # we can run the simulation multiple times and then show the self-org/accumulated success for each
 # separately and together
 
-# TODO add multiprocessing support
 if __name__ == '__main__':
     for i in range(number_of_iterations):
         DC.run_simulation(i, ui, print_excel, end_time)
