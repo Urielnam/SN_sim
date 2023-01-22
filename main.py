@@ -12,7 +12,7 @@ ui = False
 print_excel = False
 end_time = 1000
 number_of_iterations = 6
-max_resource = 15
+max_resource = 50
 
 simulation_collector = {}
 success_vs_self_org_dict = {}
