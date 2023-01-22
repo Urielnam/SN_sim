@@ -12,7 +12,7 @@ import multiprocessing
 
 ui = False
 print_excel = False
-end_time = 1000
+end_time = 10000
 number_of_iterations = 6
 max_resource = 100
 
