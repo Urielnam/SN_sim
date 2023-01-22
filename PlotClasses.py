@@ -6,6 +6,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
 import numpy as np
 from Simulation import data_type_keys
+import random
 
 # f = plt.figure(figsize=(2, 2), dpi=72)
 # a3 = f.add_subplot(121)
@@ -17,9 +18,10 @@ from Simulation import data_type_keys
 
 
 # draw the graph for a single run.
-def paint_final(simulation_collector, dt):
+def paint_final(simulation_collector, dt, run_num):
 
-    f = plt.figure(figsize=(2, 2), dpi=72)
+    f = plt.figure(figsize=(2, 2))
+    f.suptitle('This is simulation run #' + str(run_num))
     a3 = f.add_subplot(121)
     a3.plot()
     a1 = f.add_subplot(222)
@@ -27,20 +29,11 @@ def paint_final(simulation_collector, dt):
     a2 = f.add_subplot(224)
     a2.plot()
 
-    # data_plot = FigureCanvasTkAgg(f, master=main)
-    # data_plot.get_tk_widget().config(height=400)
-    # data_plot.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
-
-
     # Draw the inital state of the clock and data on the canvas
 
     # re-draw the clock and data fields on the canvas. Also update the matplotlib charts
 
-    # canvas.delete(self.time)
-
     # Delete previous data.
-
-    # dt = 5
 
     a1.set_xlabel("Time")
     a1.set_ylabel("Average Data Age")
@@ -58,7 +51,6 @@ def paint_final(simulation_collector, dt):
     a2.set_ylabel("Accumulated Success")
 
     # code to calculate step function.
-    # successful_operations_total[float(env.now)].append(len([x for x in successful_operations if x > env.now - dt]))
     a2.plot([t for (t, success) in simulation_collector['successful_operations_total'].items()],
             [success for (t, success) in simulation_collector['successful_operations_total'].items()],
             label="Average success over last " + str(dt) + " timesteps")
@@ -91,5 +83,51 @@ def paint_final(simulation_collector, dt):
 
     a2.legend(loc="upper left")
 
-    # data_plot.draw()
+
+# a function that draws graphs for multiple runs
+# it gains the data from the simulation collector and then constructs the frame
+# top frame has the success from two runs, rest of the graph has all simulations split in a 2x2, 2x3, 3x3, etc config
+def multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_of_iterations):
+    max_number_of_iterations = 2
+    if number_of_iterations<max_number_of_iterations:
+        for i in range(number_of_iterations):
+            paint_final(simulation_collector["run #" + str(i)], 5, i)
+    else:
+        for i in random.choices(range(number_of_iterations), k=max_number_of_iterations):
+            paint_final(simulation_collector["run #" + str(i)], 5, i)
+
+    plot_self_org_success_with_error(success_vs_self_org_dict["total"])
+    plot_all_success(simulation_collector)
     plt.show()
+
+
+def plot_self_org_success_with_error(success_vs_self_org_dict):
+    plt.figure()
+    x = []
+    y = []
+    e = []
+
+    for self_org in success_vs_self_org_dict:
+        x.append(self_org)
+        y.append(success_vs_self_org_dict[self_org]["average"])
+        e.append(success_vs_self_org_dict[self_org]["stdev"])
+
+    plt.errorbar(x, y, e, linestyle='None', marker='^')
+
+    # plt.show()
+
+
+def plot_all_success(simulation_collector):
+    plt.figure()
+
+    for run_num in simulation_collector:
+        x = simulation_collector[run_num]["successful_operations"]
+        y = [i+1 for i in range(len(x))]
+
+        plt.plot(x, y, label=run_num)
+
+    plt.legend()
+
+
+
+

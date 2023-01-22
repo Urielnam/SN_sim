@@ -7,14 +7,12 @@ starts file Simulation.py
 import Simulation
 import PlotClasses
 import BackendClasses
-import UIClasses
-import multiprocessing
 
 ui = False
 print_excel = False
-end_time = 10000
+end_time = 1000
 number_of_iterations = 6
-max_resource = 100
+max_resource = 15
 
 simulation_collector = {}
 success_vs_self_org_dict = {}
@@ -42,11 +40,10 @@ for i in range(number_of_iterations):
 BackendClasses.calc_average_stdev(success_vs_self_org_dict["total"])
 # function to analyze the proportions between self - org and accumulated success.
 
-# currently a function showing only one run. I want a function to stack different runs.
+# PlotClasses.plot_self_org_success_with_error(success_vs_self_org_dict["total"])
 
-UIClasses.plot_self_org_success_with_error(success_vs_self_org_dict["total"])
-
-PlotClasses.paint_final(simulation_collector["run #" + str(0)], dt=5)
+# PlotClasses.paint_final(simulation_collector["run #" + str(0)], dt=5)
+PlotClasses.multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_of_iterations)
 
 
 

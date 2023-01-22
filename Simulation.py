@@ -5,7 +5,7 @@ from datetime import datetime
 
 from collections import defaultdict
 from BackendClasses import clockanddatacalc_func
-import UIClasses
+# import UIClasses
 
 # -------------------------
 # SIMULATION
@@ -30,6 +30,8 @@ class Data:
 # all plotted data - need to check how it's done maybe?
 
 def main_run(ui, print_excel, end_time, max_resource):
+    if ui:
+        import UIClasses
     # declare all required dictionaries so they can be deleted at the end of the run
 
     # -------------------------
@@ -377,12 +379,14 @@ def main_run(ui, print_excel, end_time, max_resource):
     env.process(array_upgrade(env, array, analysis_station, action_station))
     env.process(analysis_upgrade(env, analysis_station, array, action_station))
     env.process(action_upgrade(env, action_station, array, analysis_station))
-    env.process(UIClasses.save_graph(env, end_time, now))
+    if ui:
+        env.process(UIClasses.save_graph(env, end_time, now))
 
     env.run(until=end_time)
 
     if ui:
         UIClasses.main.mainloop()
+
     simulation_collector = {
         "data_age": data_age,
         "data_age_by_type": data_age_by_type,
@@ -390,7 +394,8 @@ def main_run(ui, print_excel, end_time, max_resource):
         "number_of_sensors": number_of_sensors,
         "agent_flow_rates_by_type": agent_flow_rates_by_type,
         "total_resource": total_resource,
-        "self_organization_measure": self_organization_measure
+        "self_organization_measure": self_organization_measure,
+        "successful_operations": successful_operations
     }
 
     def print_to_file(simulation_collector):
