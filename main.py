@@ -4,19 +4,15 @@ Runs the simulation with selected parameters
 starts file Simulation.py
 """
 
-import Simulation
+
 import PlotClasses
 import BackendClasses
-
-import UIClasses
 import Data_collector as DC
-from multiprocessing import Pool
 
 ui = False
 print_excel = False
 end_time = 100
 number_of_iterations = 3
-
 max_resource = 50
 
 
@@ -26,7 +22,7 @@ max_resource = 50
 
 if __name__ == '__main__':
     for i in range(number_of_iterations):
-        DC.run_simulation(i, ui, print_excel, end_time)
+        DC.run_simulation(i, ui, print_excel, end_time, max_resource)
 
         DC.build_run_dict(i)
 
