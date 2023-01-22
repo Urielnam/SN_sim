@@ -9,6 +9,8 @@ success_vs_self_org_dict["total"] = {}
 def run_simulation(i, ui, print_excel, end_time, max_resource):
     simulation_collector["run #" + str(i)] = Simulation.main_run(ui, print_excel, end_time, max_resource)
 
+    build_run_dict(i)
+
 
 def build_run_dict(i):
     success_vs_self_org_dict["run #" + str(i)] = BackendClasses.calc_success_vs_self_org(

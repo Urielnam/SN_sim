@@ -8,6 +8,8 @@ starts file Simulation.py
 import PlotClasses
 import BackendClasses
 import Data_collector as DC
+from multiprocessing import Process
+
 
 ui = False
 print_excel = False
@@ -22,9 +24,10 @@ max_resource = 50
 
 if __name__ == '__main__':
     for i in range(number_of_iterations):
-        DC.run_simulation(i, ui, print_excel, end_time, max_resource)
+        p = Process(target=DC.run_simulation, args=(i, ui, print_excel, end_time))
+        p.start()
+        p.join()
 
-        DC.build_run_dict(i)
 
     BackendClasses.calc_average_stdev(DC.success_vs_self_org_dict["total"])
     # function to analyze the proportions between self - org and accumulated success.
