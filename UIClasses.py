@@ -340,16 +340,4 @@ def create_folder_path(path):
         os.mkdir(path)
 
 
-def plot_self_org_success_with_error(success_vs_self_org_dict):
-    x = []
-    y = []
-    e = []
 
-    for self_org in success_vs_self_org_dict:
-        x.append(self_org)
-        y.append(success_vs_self_org_dict[self_org]["average"])
-        e.append(success_vs_self_org_dict[self_org]["stdev"])
-
-    plt.errorbar(x, y, e, linestyle='None', marker='^')
-
-    plt.show()
