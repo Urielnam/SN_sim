@@ -8,46 +8,32 @@ import Simulation
 import PlotClasses
 import BackendClasses
 import UIClasses
-import multiprocessing
+import Data_collector as DC
+from multiprocessing import Pool
 
 ui = False
 print_excel = False
-end_time = 1000
-number_of_iterations = 6
+end_time = 100
+number_of_iterations = 3
 
-simulation_collector = {}
-success_vs_self_org_dict = {}
-success_vs_self_org_dict["total"] = {}
+
 # we can run the simulation multiple times and then show the self-org/accumulated success for each
 # separately and together
 
 # TODO add multiprocessing support
-for i in range(number_of_iterations):
-    simulation_collector["run #" + str(i)] = Simulation.main_run(ui, print_excel, end_time)
+if __name__ == '__main__':
+    for i in range(number_of_iterations):
+        DC.run_simulation(i, ui, print_excel, end_time)
 
-    success_vs_self_org_dict["run #" + str(i)] = BackendClasses.calc_success_vs_self_org(
-        simulation_collector["run #" + str(i)]["self_organization_measure"],
-        simulation_collector["run #" + str(i)]["successful_operations_total"])
-    BackendClasses.calc_average_stdev(success_vs_self_org_dict["run #" + str(i)])
+        DC.build_run_dict(i)
 
-    for x in success_vs_self_org_dict["run #" + str(i)]:
-        if x not in success_vs_self_org_dict["total"]:
-            success_vs_self_org_dict["total"][x] = {"values": success_vs_self_org_dict["run #" + str(i)][x]["values"]}
-        else:
-            success_vs_self_org_dict["total"][x]["values"] = success_vs_self_org_dict["total"][x]["values"] \
-                                                   + success_vs_self_org_dict["run #" + str(i)][x]["values"]
+    BackendClasses.calc_average_stdev(DC.success_vs_self_org_dict["total"])
+    # function to analyze the proportions between self - org and accumulated success.
 
+    # currently a function showing only one run. I want a function to stack different runs.
 
-BackendClasses.calc_average_stdev(success_vs_self_org_dict["total"])
-# function to analyze the proportions between self - org and accumulated success.
+    UIClasses.plot_self_org_success_with_error(DC.success_vs_self_org_dict["total"])
 
-# currently a function showing only one run. I want a function to stack different runs.
-
-UIClasses.plot_self_org_success_with_error(success_vs_self_org_dict["total"])
-
-PlotClasses.paint_final(simulation_collector["run #" + str(0)], dt=5)
-
-
-
+    PlotClasses.paint_final(DC.simulation_collector["run #" + str(0)], dt=5)
 
 # f.show()
