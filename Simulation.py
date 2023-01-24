@@ -42,6 +42,7 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
     data_age = defaultdict(lambda: [])
     data_age_by_type = defaultdict(lambda: [])
     successful_operations = []
+    timestep_list = []
     successful_operations_total = defaultdict(lambda: [])
     number_of_sensors = defaultdict(lambda: [])
     agent_flow_rates_by_type = defaultdict(lambda: [])
@@ -133,8 +134,7 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
                                   analysis_array_queue, array_action_queue, action_array_queue, array_sensor_queue,
                                   data_age, self_organization_measure, dt, agent_flow_rates_by_type, number_of_sensors,
                                   successful_operations_total, successful_operations, sensor_list, array,
-                                  analysis_station,
-                                  action_station, total_resource)
+                                  analysis_station, action_station, total_resource,timestep_list)
 
             if ui:
                 clock.tick(env.now)
@@ -429,7 +429,8 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
         "agent_flow_rates_by_type": agent_flow_rates_by_type,
         "total_resource": total_resource,
         "self_organization_measure": self_organization_measure,
-        "successful_operations": successful_operations
+        "successful_operations": successful_operations,
+        "last dt timesteps": timestep_list
     }
 
     def print_to_file(simulation_collector):
