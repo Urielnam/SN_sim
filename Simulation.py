@@ -270,13 +270,13 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
                     yield self.env.timeout(1 / self.flow_rate)
                     # print(array_action_queue[0].status)
                     if a.status:
-                        print("Attack successful!")
+                        # print("Attack successful!")
                         # send back positive feedback
                         action_array_queue.append(Data(True, self.env.now,
                                                        'feedback', a.creator))
                         successful_operations.append(self.env.now)
                     if not a.status:
-                        print("Attack failed")
+                        # print("Attack failed")
                         # send back negative feedback
                         action_array_queue.append(Data(False, self.env.now,
                                                        'feedback', a.creator))
@@ -397,9 +397,11 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
                                            successful_operations_total, number_of_sensors, agent_flow_rates_by_type,
                                            total_resource, self_organization_measure)
 
-    env = simpy.rt.RealtimeEnvironment(factor=0.1, strict=False)
-    # do not remove, it's a faster env function:
-    # env = simpy.Environment()
+    if ui:
+        env = simpy.rt.RealtimeEnvironment(factor=0.1, strict=False)
+    else:
+        # do not remove, it's a faster env function:
+        env = simpy.Environment()
 
     array = Array(env, ui)
     action_station = ActionStation(env)

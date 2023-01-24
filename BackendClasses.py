@@ -1,5 +1,9 @@
 import numpy as np
 from statistics import mean, stdev
+from line_profiler import LineProfiler
+
+# old not-optimized function, when end_time = 1000, iterations = 5, resource = 100 and dt = 5 it took 444s out of a
+# total of 626s
 
 
 def calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env):
@@ -29,6 +33,7 @@ def calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env):
     changes_by_key.append(change_count)
 
     return np.sum(changes_by_key)
+
 
 
 # calculate system self organization over time (for a2).

@@ -8,14 +8,6 @@ import numpy as np
 from Simulation import data_type_keys
 import random
 
-# f = plt.figure(figsize=(2, 2), dpi=72)
-# a3 = f.add_subplot(121)
-# a3.plot()
-# a1 = f.add_subplot(222)
-# a1.plot()
-# a2 = f.add_subplot(224)
-# a2.plot()
-
 
 # draw the graph for a single run.
 def paint_final(simulation_collector, dt, run_num):
@@ -151,7 +143,7 @@ def plot_self_org_with_flow_data(run_num, simulation_collector, dt):
                    j in range(1, len(simulation_collector["run #" + str(run_num)]['agent_flow_rates_by_type'][key]))]
         measure.insert(0, 0)
         axis[1].bar(x, measure, bottom=bottom, width=0.1)
-        axis[1].legend(key)
+        axis[1].legend(key, loc="upper right")
         bottom = [bottom[i] + measure[i] for i in range(len(bottom))]
 
     measure = [simulation_collector["run #" + str(run_num)]['number_of_sensors'][x[j]] !=
@@ -159,7 +151,7 @@ def plot_self_org_with_flow_data(run_num, simulation_collector, dt):
                j in range(1, len(simulation_collector["run #" + str(run_num)]['number_of_sensors']))]
     measure.insert(0, 0)
     axis[1].bar(x, measure, bottom=bottom, width=0.1)
-    axis[1].legend("Sensors")
+    axis[1].legend("Sensors", loc="upper right")
 
 
 

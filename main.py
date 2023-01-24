@@ -4,14 +4,15 @@ Runs the simulation with selected parameters
 starts file Simulation.py
 """
 
-
 import PlotClasses
 import BackendClasses
 import Data_collector as DC
+import psutil
+import os
 
 ui = False
 print_excel = False
-end_time = 10000
+end_time = 1000
 number_of_iterations = 5
 max_resource = 100
 dt = 5
@@ -19,11 +20,16 @@ dt = 5
 # we can run the simulation multiple times and then show the self-org/accumulated success for each
 # separately and together
 
+def memory_check():
+    process = psutil.Process(os.getpid())
+    print(process.memory_info().rss / (1024 * 1024), "MB")
+
 
 if __name__ == '__main__':
     for i in range(number_of_iterations):
         DC.run_simulation(i, ui, print_excel, end_time, max_resource, dt)
-
+        print("done simulation " + str(i))
+        memory_check()
         DC.build_run_dict(i)
 
     BackendClasses.calc_average_stdev(DC.success_vs_self_org_dict["total"])
