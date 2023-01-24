@@ -5,12 +5,18 @@ from statistics import mean, stdev
 def calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env):
     changes_by_key = []
 
+    # for every agent type
     for key_n in agent_flow_rates_by_type.keys():
+        # create new parameter
         change_count = 0
-        relevant_list_of_timesteps_keys = [x for x in agent_flow_rates_by_type[key_n].keys() if x > (env.now - dt)]
-        for x in range(len(relevant_list_of_timesteps_keys) - 1):
-            if agent_flow_rates_by_type[key_n][relevant_list_of_timesteps_keys[x]] != \
-                    agent_flow_rates_by_type[key_n][relevant_list_of_timesteps_keys[x + 1]]:
+        # create a list of timesteps that is in the range of [env.now, env.now-dt]
+        relevant_list_of_timesteps_keys = [timestep for timestep in agent_flow_rates_by_type[key_n].keys() if timestep > (env.now - dt)]
+
+        # iterate over the total number of timesteps
+        for i in range(len(relevant_list_of_timesteps_keys) - 1):
+            # if there was a change in previous timestep - add 1
+            if agent_flow_rates_by_type[key_n][relevant_list_of_timesteps_keys[i]] != \
+                    agent_flow_rates_by_type[key_n][relevant_list_of_timesteps_keys[i + 1]]:
                 change_count += 1
         changes_by_key.append(change_count)
 

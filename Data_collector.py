@@ -6,8 +6,8 @@ success_vs_self_org_dict = {}
 success_vs_self_org_dict["total"] = {}
 
 
-def run_simulation(i, ui, print_excel, end_time, max_resource):
-    simulation_collector["run #" + str(i)] = Simulation.main_run(ui, print_excel, end_time, max_resource)
+def run_simulation(i, ui, print_excel, end_time, max_resource, dt):
+    simulation_collector["run #" + str(i)] = Simulation.main_run(ui, print_excel, end_time, max_resource, dt)
 
 
 def build_run_dict(i):

@@ -11,10 +11,10 @@ import Data_collector as DC
 
 ui = False
 print_excel = False
-end_time = 100
-number_of_iterations = 3
-max_resource = 50
-
+end_time = 10000
+number_of_iterations = 5
+max_resource = 100
+dt = 5
 
 # we can run the simulation multiple times and then show the self-org/accumulated success for each
 # separately and together
@@ -22,7 +22,7 @@ max_resource = 50
 
 if __name__ == '__main__':
     for i in range(number_of_iterations):
-        DC.run_simulation(i, ui, print_excel, end_time, max_resource)
+        DC.run_simulation(i, ui, print_excel, end_time, max_resource, dt)
 
         DC.build_run_dict(i)
 
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     # function to analyze the proportions between self - org and accumulated success.
 
 
-    PlotClasses.multiple_plot_graphs(DC.simulation_collector, DC.success_vs_self_org_dict, number_of_iterations)
+    PlotClasses.multiple_plot_graphs(DC.simulation_collector, DC.success_vs_self_org_dict, number_of_iterations, dt)
 
 
     # currently a function showing only one run. I want a function to stack different runs.
