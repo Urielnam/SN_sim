@@ -89,7 +89,7 @@ def paint_final(simulation_collector, dt, run_num):
 # top frame has the success from two runs, rest of the graph has all simulations split in a 2x2, 2x3, 3x3, etc config
 def multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_of_iterations):
     max_number_of_iterations = 2
-    if number_of_iterations<max_number_of_iterations:
+    if number_of_iterations < max_number_of_iterations:
         for i in range(number_of_iterations):
             paint_final(simulation_collector["run #" + str(i)], 5, i)
     else:

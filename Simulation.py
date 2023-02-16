@@ -14,6 +14,8 @@ data_type_keys = ["intel", "feedback", "target"]
 
 # Intel object. Has a real/wrong status and time created
 # data types: "intel", "feedback"
+
+
 class Data:
     def __init__(self, status, time, type, creator):
         self.status = status
@@ -38,17 +40,17 @@ def main_run(ui, print_excel, end_time, max_resource):
     # CONFIGURATION
     # -------------------------
 
-    data_age = defaultdict(lambda: [])
-    data_age_by_type = defaultdict(lambda: [])
+    data_age = {}
+    data_age_by_type = {}
     successful_operations = []
-    successful_operations_total = defaultdict(lambda: [])
-    number_of_sensors = defaultdict(lambda: [])
-    agent_flow_rates_by_type = defaultdict(lambda: [])
-    agent_flow_rates_by_type["Array"] = defaultdict(lambda: [])
-    agent_flow_rates_by_type["Analysis Station"] = defaultdict(lambda: [])
-    agent_flow_rates_by_type["Action Station"] = defaultdict(lambda: [])
-    total_resource = defaultdict(lambda: [])
-    self_organization_measure = defaultdict(lambda: [])
+    successful_operations_total = {}
+    number_of_sensors = {}
+    agent_flow_rates_by_type = {}
+    agent_flow_rates_by_type["Array"] = {}
+    agent_flow_rates_by_type["Analysis Station"] = {}
+    agent_flow_rates_by_type["Action Station"] = {}
+    total_resource = {}
+    self_organization_measure = {}
     # max_resource = 15
     # end_time = 20
 
@@ -111,12 +113,10 @@ def main_run(ui, print_excel, end_time, max_resource):
 
     # used for backend classes calculation
     for key in static_image_map_keys:
-        data_age_by_type[key] = defaultdict(lambda: [])
-
-
+        data_age_by_type[key] = {}
 
     for key in data_type_keys:
-        data_age_by_type[key] = defaultdict(lambda: [])
+        data_age_by_type[key] = {}
 
     start_row = 95
     regular_height = 30
@@ -387,7 +387,7 @@ def main_run(ui, print_excel, end_time, max_resource):
     if ui:
         UIClasses.main.mainloop()
 
-    simulation_collector = {
+    local_simulation_collector = {
         "data_age": data_age,
         "data_age_by_type": data_age_by_type,
         "successful_operations_total": successful_operations_total,
@@ -398,11 +398,11 @@ def main_run(ui, print_excel, end_time, max_resource):
         "successful_operations": successful_operations
     }
 
-    def print_to_file(simulation_collector):
+    def print_to_file(local_simulation_collector):
         # convert into dataframe
         path = UIClasses.create_folder("excels", now)
-        for val in simulation_collector:
-            df = pd.DataFrame(data=simulation_collector[val])
+        for val in local_simulation_collector:
+            df = pd.DataFrame(data=local_simulation_collector[val])
             # df = df.T
             # convert into excel
             excel_name = path + "\\" + val + ".xlsx"
@@ -410,8 +410,8 @@ def main_run(ui, print_excel, end_time, max_resource):
 
 
     if print_excel:
-        print_to_file(simulation_collector)
-    return simulation_collector
+        print_to_file(local_simulation_collector)
+    return local_simulation_collector
 
 
 
