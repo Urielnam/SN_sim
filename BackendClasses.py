@@ -2,6 +2,13 @@ import numpy as np
 from statistics import mean, stdev
 
 
+def add_to_dict_arr(dict, key, val):
+    if key in dict:
+        dict[key].append(val)
+    else:
+        dict[key] = [val]
+
+
 def calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env):
     changes_by_key = []
 
@@ -27,8 +34,11 @@ def calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env):
 
 # calculate system self organization over time (for a2).
 def calc_self_org_over_time(self_organization_measure, env, dt, agent_flow_rates_by_type, number_of_sensors):
-    self_organization_measure[float(env.now)].append(calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors,
-                                                                   env))
+    # self_organization_measure[float(env.now)].append(calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors,
+    # env))
+
+    result_self_org = calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env)
+    add_to_dict_arr(self_organization_measure, float(env.now), result_self_org)
 
 
 # calculate data type age over time (for a1).
@@ -39,36 +49,34 @@ def calc_ages(data_type_keys, data_age_by_type, env, sensor_array_queue, array_a
     ages = [env.now - data_object.time for data_object in (sensor_array_queue + array_analysis_queue +
                                                            analysis_array_queue + array_action_queue +
                                                            action_array_queue + array_sensor_queue)]
-    data_age[float(env.now)].append(ages)
+
+    # data_age[float(env.now)].append(ages)
+    add_to_dict_arr(data_age, float(env.now), ages)
 
     # for each key in image_map2 (data type)
     # in dict "data_age_by_type"
     # time now minus creation time.
     # for the list of object with that data type in all 6 arrays
     for key in data_type_keys:
-        data_age_by_type[key][float(env.now)].append(
-            [env.now - data_object.time for data_object in [
+        add_to_dict_arr(data_age_by_type[key], float(env.now), [env.now - data_object.time for data_object in [
                 i for i in (sensor_array_queue + array_analysis_queue + analysis_array_queue +
                             array_action_queue + action_array_queue + array_sensor_queue) if i.type == key]])
 
 
 # calculate measure of success over time (for a2)
 def calc_success_over_time(successful_operations_total, env, successful_operations, dt):
-    successful_operations_total[float(env.now)].append(len([x for x in successful_operations if x > env.now - dt]))
+    add_to_dict_arr(successful_operations_total, float(env.now),
+                    len([x for x in successful_operations if x > env.now - dt]))
 
 
 # calculate number of objects over time (for a3)
 def calculate_number_of_objects(number_of_sensors, env, sensor_list, agent_flow_rates_by_type, array, analysis_station,
                                 action_station, total_resource):
-    number_of_sensors[float(env.now)].append(len(sensor_list))
-    agent_flow_rates_by_type["Array"][float(env.now)].append(array.flow_rate)
-    agent_flow_rates_by_type["Analysis Station"][float(env.now)].append(
-        analysis_station.flow_rate)
-    agent_flow_rates_by_type["Action Station"][float(env.now)].append(
-        action_station.flow_rate)
-    total_resource[float(env.now)].append(len(sensor_list) + array.flow_rate +
-                                          analysis_station.flow_rate +
-                                          action_station.flow_rate)
+    add_to_dict_arr(number_of_sensors, float(env.now), (len(sensor_list)))
+    add_to_dict_arr(agent_flow_rates_by_type["Array"], float(env.now), array.flow_rate)
+    add_to_dict_arr(agent_flow_rates_by_type["Analysis Station"], float(env.now), analysis_station.flow_rate)
+    add_to_dict_arr(agent_flow_rates_by_type["Action Station"], float(env.now), action_station.flow_rate)
+    add_to_dict_arr(total_resource, float(env.now), len(sensor_list) + array.flow_rate + analysis_station.flow_rate + action_station.flow_rate)
 
 
 # accumulated function for all secondary calculation for the simulation.
@@ -77,6 +85,7 @@ def clockanddatacalc_func(data_type_keys, data_age_by_type, env, sensor_array_qu
                           data_age, self_organization_measure, dt, agent_flow_rates_by_type, number_of_sensors,
                           successful_operations_total, successful_operations, sensor_list, array, analysis_station,
                           action_station, total_resource):
+
     calc_ages(data_type_keys, data_age_by_type, env, sensor_array_queue, array_analysis_queue, analysis_array_queue,
               array_action_queue, action_array_queue, array_sensor_queue, data_age)
     calc_self_org_over_time(self_organization_measure, env, dt, agent_flow_rates_by_type, number_of_sensors)
@@ -87,8 +96,8 @@ def clockanddatacalc_func(data_type_keys, data_age_by_type, env, sensor_array_qu
 
 def calc_average_stdev(success_vs_self_org_dict):
     for self_org_key in success_vs_self_org_dict:
-        success_vs_self_org_dict[self_org_key]["average"]= mean(success_vs_self_org_dict[self_org_key]["values"])
-        if len(success_vs_self_org_dict[self_org_key]["values"])>1:
+        success_vs_self_org_dict[self_org_key]["average"] = mean(success_vs_self_org_dict[self_org_key]["values"])
+        if len(success_vs_self_org_dict[self_org_key]["values"]) > 1:
             success_vs_self_org_dict[self_org_key]["stdev"] = stdev(success_vs_self_org_dict[self_org_key]["values"])
         else:
             success_vs_self_org_dict[self_org_key]["stdev"] = 0
@@ -105,8 +114,8 @@ def calc_success_vs_self_org(self_organization_measure_dict, successful_operatio
         self_org_key = self_organization_measure_dict[key][0]
         successful_op_value = successful_operations_total_dict[key][0]
         if self_org_key not in success_vs_self_org_dict:
-            success_vs_self_org_dict[self_org_key] = {"values" : []}
-        success_vs_self_org_dict[self_org_key]["values"].append(successful_op_value)
+            success_vs_self_org_dict[self_org_key] = {"values": []}
+        add_to_dict_arr(success_vs_self_org_dict[self_org_key], "values", successful_op_value)
 
     return success_vs_self_org_dict
 
