@@ -8,14 +8,6 @@ import numpy as np
 from Simulation import data_type_keys
 import random
 
-# f = plt.figure(figsize=(2, 2), dpi=72)
-# a3 = f.add_subplot(121)
-# a3.plot()
-# a1 = f.add_subplot(222)
-# a1.plot()
-# a2 = f.add_subplot(224)
-# a2.plot()
-
 
 # draw the graph for a single run.
 def paint_final(simulation_collector, dt, run_num):
@@ -87,22 +79,27 @@ def paint_final(simulation_collector, dt, run_num):
 # a function that draws graphs for multiple runs
 # it gains the data from the simulation collector and then constructs the frame
 # top frame has the success from two runs, rest of the graph has all simulations split in a 2x2, 2x3, 3x3, etc config
-def multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_of_iterations):
+def multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_of_iterations, dt):
     max_number_of_iterations = 2
     if number_of_iterations < max_number_of_iterations:
         for i in range(number_of_iterations):
             paint_final(simulation_collector["run #" + str(i)], 5, i)
     else:
-        for i in random.choices(range(number_of_iterations), k=max_number_of_iterations):
+        for i in random.sample(range(number_of_iterations), k=max_number_of_iterations):
             paint_final(simulation_collector["run #" + str(i)], 5, i)
 
     plot_self_org_success_with_error(success_vs_self_org_dict["total"])
+
     plot_all_success(simulation_collector)
+
+    plot_self_org_with_flow_data(0, simulation_collector, dt)
+
     plt.show()
 
 
 def plot_self_org_success_with_error(success_vs_self_org_dict):
     plt.figure()
+    plt.title("Self-Org vs Success")
     x = []
     y = []
     e = []
@@ -119,6 +116,7 @@ def plot_self_org_success_with_error(success_vs_self_org_dict):
 
 def plot_all_success(simulation_collector):
     plt.figure()
+    plt.title("Cummulative Success")
 
     for run_num in simulation_collector:
         x = simulation_collector[run_num]["successful_operations"]
@@ -127,6 +125,35 @@ def plot_all_success(simulation_collector):
         plt.plot(x, y, label=run_num)
 
     plt.legend()
+
+
+def plot_self_org_with_flow_data(run_num, simulation_collector, dt):
+
+
+    x = [timesteps for timesteps in simulation_collector["run #" + str(run_num)]['self_organization_measure'].keys()]
+    number_of_figs = 2
+    fig, axis = plt.subplots(number_of_figs)
+    fig.subplots_adjust(hspace=0.4)
+    axis[0].plot([a for (t, a) in simulation_collector["run #" + str(run_num)]['self_organization_measure'].items()])
+
+    bottom = [0]*len(x)
+    for key in simulation_collector["run #" + str(run_num)]['agent_flow_rates_by_type'].keys():
+        measure = [simulation_collector["run #" + str(run_num)]['agent_flow_rates_by_type'][key][x[j]] !=
+                   simulation_collector["run #" + str(run_num)]['agent_flow_rates_by_type'][key][x[j-1]] for
+                   j in range(1, len(simulation_collector["run #" + str(run_num)]['agent_flow_rates_by_type'][key]))]
+        measure.insert(0, 0)
+        axis[1].bar(x, measure, bottom=bottom, width=0.1)
+        axis[1].legend(key, loc="upper right")
+        bottom = [bottom[i] + measure[i] for i in range(len(bottom))]
+
+    measure = [simulation_collector["run #" + str(run_num)]['number_of_sensors'][x[j]] !=
+               simulation_collector["run #" + str(run_num)]['number_of_sensors'][x[j-1]] for
+               j in range(1, len(simulation_collector["run #" + str(run_num)]['number_of_sensors']))]
+    measure.insert(0, 0)
+    axis[1].bar(x, measure, bottom=bottom, width=0.1)
+    axis[1].legend("Sensors", loc="upper right")
+
+
 
 
 

@@ -8,20 +8,38 @@ import PlotClasses
 import BackendClasses
 import multiprocessing
 import Data_collector as DC
+import psutil
+import os
 
 ui = False
 print_excel = False
-end_time = 100
-number_of_iterations = 3
-max_resource = 50
-max_resource = 50
+
+end_time = 1000
+number_of_iterations = 5
+max_resource = 100
+dt = 5
 
 
 # we can run the simulation multiple times and then show the self-org/accumulated success for each
 # separately and together
 
-def work(simulation_collector, success_vs_self_org_dict, i):
-    DC.run_simulation(simulation_collector, success_vs_self_org_dict, i, ui, print_excel, end_time, max_resource)
+
+def memory_check():
+    process = psutil.Process(os.getpid())
+    print(process.memory_info().rss / (1024 * 1024), "MB")
+
+
+def work(simulation_collector, success_vs_self_org_dict, i, dt):
+    DC.run_simulation(simulation_collector, success_vs_self_org_dict, i, ui, print_excel, end_time, max_resource, dt)
+
+
+if __name__ == '__main__':
+    for i in range(number_of_iterations):
+        DC.run_simulation(i, ui, print_excel, end_time, max_resource, dt)
+        print("done simulation " + str(i))
+        memory_check()
+        DC.build_run_dict(i)
+
 
 
 if __name__ == '__main__':
@@ -35,8 +53,10 @@ if __name__ == '__main__':
         simulation_collector["run #" + str(i)] = {}
         p = multiprocessing.Process(
             target=work,
-            args=(simulation_collector, success_vs_self_org_dict, i)
+            args=(simulation_collector, success_vs_self_org_dict, i, dt)
         )
+        memory_check()
+        DC.build_run_dict(simulation_collector, success_vs_self_org_dict,i)
         processes.append(p)
         p.start()
 
@@ -46,7 +66,13 @@ if __name__ == '__main__':
     BackendClasses.calc_average_stdev(success_vs_self_org_dict["total"])
 
     # function to analyze the proportions between self - org and accumulated success.
-    # function to analyze the proportions between self - org and accumulated success.
-    PlotClasses.multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_of_iterations)
+
+    PlotClasses.multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_of_iterations, dt)
+
+    # currently a function showing only one run. I want a function to stack different runs.
+
+    # UIClasses.plot_self_org_success_with_error(DC.success_vs_self_org_dict["total"])
+
+    # PlotClasses.paint_final(DC.simulation_collector["run #" + str(0)], dt=5)
 
 # f.show()
