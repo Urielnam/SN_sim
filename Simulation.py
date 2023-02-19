@@ -18,7 +18,6 @@ data_type_keys = ["intel", "feedback", "target"]
 
 class Data:
     def __init__(self, status, time, type, creator):
-        # status parameter is real/false - it's the notion of if the data is right or wrong.
         self.status = status
         self.time = time
         # data types - intel, feedback
@@ -32,7 +31,7 @@ class Data:
 # data to include
 # all plotted data - need to check how it's done maybe?
 
-def main_run(ui, print_excel, end_time, max_resource, dt):
+def main_run(ui, print_excel, end_time, max_resource):
     if ui:
         import UIClasses
     # declare all required dictionaries so they can be deleted at the end of the run
@@ -44,9 +43,6 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
     data_age = {}
     data_age_by_type = {}
     successful_operations = []
-
-    timestep_list = []
-  
     successful_operations_total = {}
     number_of_sensors = {}
     agent_flow_rates_by_type = {}
@@ -55,7 +51,6 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
     agent_flow_rates_by_type["Action Station"] = {}
     total_resource = {}
     self_organization_measure = {}
-
     # max_resource = 15
     # end_time = 20
 
@@ -133,11 +128,13 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
 
         while True:
             yield env.timeout(0.1)
+            dt = 5
             clockanddatacalc_func(data_type_keys, data_age_by_type, env, sensor_array_queue, array_analysis_queue,
                                   analysis_array_queue, array_action_queue, action_array_queue, array_sensor_queue,
                                   data_age, self_organization_measure, dt, agent_flow_rates_by_type, number_of_sensors,
                                   successful_operations_total, successful_operations, sensor_list, array,
-                                  analysis_station, action_station, total_resource,timestep_list)
+                                  analysis_station,
+                                  action_station, total_resource)
 
             if ui:
                 clock.tick(env.now)
@@ -273,13 +270,13 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
                     yield self.env.timeout(1 / self.flow_rate)
                     # print(array_action_queue[0].status)
                     if a.status:
-                        # print("Attack successful!")
+                        print("Attack successful!")
                         # send back positive feedback
                         action_array_queue.append(Data(True, self.env.now,
                                                        'feedback', a.creator))
                         successful_operations.append(self.env.now)
                     if not a.status:
-                        # print("Attack failed")
+                        print("Attack failed")
                         # send back negative feedback
                         action_array_queue.append(Data(False, self.env.now,
                                                        'feedback', a.creator))
@@ -292,66 +289,34 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
                 analysis_station.flow_rate +
                 action_station.flow_rate) < max_resource
 
-    def create_new_sensor(sensor_number, external_environemnt):
-        # set a random number for the chances of giving good info.
-        sensor_chance = random.random()
-        # add new sensor
-        sensor_list.append(Sensor(sensor_chance, sensor_number, external_environemnt))
-        # increase sensor count
-        return sensor_number + 1
-
-    def kill_sensor(sensor):
-        sensor.is_alive = False
-        sensor_list.remove(sensor)
-
-    # we need to select how much we change the number of sensors, and then execute it.
     def sensor_maker(external_environemnt, array, analysis_station, action_station):
         sensor_number = 2
 
         while True:
-            #   LOGIC FOR IMPLEMENTATION - suggestion
-            # ---------------------------------------------
-            # do not kill a sensor if it is the last one.
-            # if we are at max resource, kill sensor.
-            # if new feedback is gained:
-            #   if good - create new sensor
-            #   if bad - kill sensor
-            # if none of the above - check self_org.
-            #   if lower then threshold - calculate what would increase the self-org and act accordingly.
-            #   currently, any change in number of sensors increases self-org.
-            #   randomly decide if increasing or decreasing (considering you won't get over max resource or kill
-            #   the last sensor
-
-            # CURRENT LOGIC
-            # -------------------------------------------
-            # while there are any feedback data:
             while len(array_sensor_queue) > 0:
 
                 # if action feedback is good, create new sensor and kill the data.
-                # if action is right:
                 if array_sensor_queue[0].status:
-
-                    # if there are enough resources - grow the number of sensors. else - do nothing.
+                    a = random.random()
                     if check_max_resource(array, analysis_station, action_station):
-                        sensor_number = create_new_sensor(sensor_number, external_environemnt)
-                    # kill the data, even if you did not create a sensor.
+                        sensor_list.append(Sensor(a, sensor_number, external_environemnt))
+                        sensor_number = sensor_number + 1
                     array_sensor_queue.pop(0)
-                # else, if actions is wrong and failed.
                 else:
                     b = array_sensor_queue[0]
                     for sensor in sensor_list.copy():
-                        # find the rouge sensor and kill it.
                         if sensor.name == b.creator:
-                            kill_sensor(sensor)
-                    # if the sensor list is empty, create a new sensor.
+                            sensor.is_alive = False
+                            sensor_list.remove(sensor)
                     if len(sensor_list) == 0:
-                        sensor_number = create_new_sensor(sensor_number, external_environemnt)
+                        a = random.random()
+                        sensor_list.append(Sensor(a, sensor_number, external_environemnt))
+                        sensor_number = sensor_number + 1
                     array_sensor_queue.pop(0)
-
-            # if we are at max resource, reduce the number of sensors
             if not check_max_resource(array, analysis_station, action_station) and len(sensor_list) > 1:
-                selected_sensor = random.choice(sensor_list)
-                kill_sensor(selected_sensor)
+                x = random.choice(sensor_list)
+                x.is_alive = False
+                sensor_list.remove(x)
 
             yield external_environemnt.timeout(0.1)
 
@@ -400,11 +365,9 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
                                            successful_operations_total, number_of_sensors, agent_flow_rates_by_type,
                                            total_resource, self_organization_measure)
 
-    if ui:
-        env = simpy.rt.RealtimeEnvironment(factor=0.1, strict=False)
-    else:
-        # do not remove, it's a faster env function:
-        env = simpy.Environment()
+    env = simpy.rt.RealtimeEnvironment(factor=0.1, strict=False)
+    # do not remove, it's a faster env function:
+    # env = simpy.Environment()
 
     array = Array(env, ui)
     action_station = ActionStation(env)
@@ -432,8 +395,7 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
         "agent_flow_rates_by_type": agent_flow_rates_by_type,
         "total_resource": total_resource,
         "self_organization_measure": self_organization_measure,
-        "successful_operations": successful_operations,
-        "last dt timesteps": timestep_list
+        "successful_operations": successful_operations
     }
 
     def print_to_file(local_simulation_collector):

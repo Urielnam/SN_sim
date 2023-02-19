@@ -3,8 +3,8 @@ import BackendClasses
 import multiprocessing
 
 
-def run_simulation(simulation_collector, success_vs_self_org_dict, i, ui, print_excel, end_time, max_resource, dt):
-    temp_run = Simulation.main_run(ui, print_excel, end_time, max_resource, dt)
+def run_simulation(simulation_collector, success_vs_self_org_dict, i, ui, print_excel, end_time, max_resource):
+    temp_run = Simulation.main_run(ui, print_excel, end_time, max_resource)
     simulation_collector["run #" + str(i)] = temp_run
     build_run_dict(simulation_collector, success_vs_self_org_dict, i)
 
