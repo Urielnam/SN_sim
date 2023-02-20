@@ -1,6 +1,5 @@
 import Simulation
 import BackendClasses
-import multiprocessing
 
 
 def run_simulation(simulation_collector, success_vs_self_org_dict, i, ui, print_excel, end_time, max_resource, dt):

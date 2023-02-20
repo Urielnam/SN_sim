@@ -80,9 +80,9 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
     # array to save the time from data analysis to data usage.
     action_data_usage_time = []
 
-    graph_list = [sensor_array_queue, analysis_array_queue, action_array_queue,
-                  array_analysis_queue, array_action_queue,
-                  array_sensor_queue]
+    # graph_list = [sensor_array_queue, analysis_array_queue, action_array_queue,
+    #               array_analysis_queue, array_action_queue,
+    #               array_sensor_queue]
 
     start_nodes = {
         "sensor to array": sensor_array_queue,
@@ -120,11 +120,9 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
     for key in static_image_map_keys:
         data_age_by_type[key] = {}
 
-    for key in data_type_keys:
-        data_age_by_type[key] = {}
 
-    start_row = 95
-    regular_height = 30
+    # start_row = 95
+    # regular_height = 30
     now = datetime.now().ctime()
     now = now.replace(":", "_")
 

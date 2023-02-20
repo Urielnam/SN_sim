@@ -1,16 +1,16 @@
 import numpy as np
 from statistics import mean, stdev
-from line_profiler import LineProfiler
 import bisect
 
 # old not-optimized function, when end_time = 1000, iterations = 5, resource = 100 and dt = 5 it took 444s out of a
 # total of 626s
 
-def add_to_dict_arr(dict, key, val):
-    if key in dict:
-        dict[key].append(val)
+
+def add_to_dict_arr(dic, key, val):
+    if key in dic:
+        dic[key].append(val)
     else:
-        dict[key] = [val]
+        dic[key] = [val]
 
 
 def calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env, timestep_list):
@@ -133,6 +133,7 @@ def calc_success_vs_self_org(self_organization_measure_dict, successful_operatio
         add_to_dict_arr(success_vs_self_org_dict[self_org_key], "values", successful_op_value)
 
     return success_vs_self_org_dict
+
 
 def prepare_timestep_list(timestep_list, dt, env):
     if len(timestep_list) >= dt*10:
