@@ -14,11 +14,12 @@ import os
 ui = False
 print_excel = False
 
-end_time = 1000
-number_of_iterations = 5
-max_resource = 100
+end_time = 100
+number_of_iterations = 2
+max_resource = 50
 dt = 5
-
+success_vs_self_org_dict = {}
+success_vs_self_org_dict = {'total': {}}
 
 # we can run the simulation multiple times and then show the self-org/accumulated success for each
 # separately and together
@@ -29,39 +30,29 @@ def memory_check():
     print(process.memory_info().rss / (1024 * 1024), "MB")
 
 
-def work(simulation_collector, success_vs_self_org_dict, i, dt):
-    DC.run_simulation(simulation_collector, success_vs_self_org_dict, i, ui, print_excel, end_time, max_resource, dt)
-
-
-if __name__ == '__main__':
-    for i in range(number_of_iterations):
-        DC.run_simulation(i, ui, print_excel, end_time, max_resource, dt)
-        print("done simulation " + str(i))
-        memory_check()
-        DC.build_run_dict(i)
-
+def work(sim_coll, ind, dt):
+    DC.run_simulation(sim_coll, ind, ui, print_excel, end_time, max_resource, dt)
 
 
 if __name__ == '__main__':
     processes = []
     manager = multiprocessing.Manager()
     simulation_collector = manager.dict()
-    success_vs_self_org_dict = manager.dict()
-    success_vs_self_org_dict = {'total': {}}
 
     for i in range(number_of_iterations):
         simulation_collector["run #" + str(i)] = {}
         p = multiprocessing.Process(
             target=work,
-            args=(simulation_collector, success_vs_self_org_dict, i, dt)
+            args=(simulation_collector, i, dt)
         )
         memory_check()
-        DC.build_run_dict(simulation_collector, success_vs_self_org_dict,i)
         processes.append(p)
         p.start()
 
     for pro in processes:
         pro.join()
+
+    DC.build_run_dict(simulation_collector, success_vs_self_org_dict)
 
     BackendClasses.calc_average_stdev(success_vs_self_org_dict["total"])
 
