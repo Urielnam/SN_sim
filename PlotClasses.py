@@ -92,7 +92,7 @@ def multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_
 
     plot_all_success(simulation_collector)
 
-    plot_self_org_with_flow_data(0, simulation_collector, dt)
+    # plot_self_org_with_flow_data(0, simulation_collector)
 
     plt.show()
 
@@ -127,10 +127,12 @@ def plot_all_success(simulation_collector):
     plt.legend()
 
 
-def plot_self_org_with_flow_data(run_num, simulation_collector, dt):
-
-
-    x = [timesteps for timesteps in simulation_collector["run #" + str(run_num)]['self_organization_measure'].keys()]
+def plot_self_org_with_flow_data(run_num, simulation_collector):
+    """
+    show the contribution of different agent types to the overall self_org_measure
+    first segment shows for the first three agent types and the last one shows for sensors.
+"""
+    x = list(simulation_collector["run #" + str(run_num)]['self_organization_measure'].keys())
     number_of_figs = 2
     fig, axis = plt.subplots(number_of_figs)
     fig.subplots_adjust(hspace=0.4)
