@@ -15,7 +15,7 @@ ui = False
 print_excel = False
 
 end_time = 100
-number_of_iterations = 2
+number_of_iterations = 1
 max_resource = 50
 dt = 5
 
@@ -53,11 +53,12 @@ if __name__ == '__main__':
     for pro in processes:
         pro.join()
 
+    print(success_vs_self_org_dict)
     BackendClasses.calc_average_stdev(success_vs_self_org_dict["total"])
 
     # function to analyze the proportions between self - org and accumulated success.
 
-    # PlotClasses.multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_of_iterations, dt)
+    PlotClasses.multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_of_iterations, dt)
 
     # currently a function showing only one run. I want a function to stack different runs.
 

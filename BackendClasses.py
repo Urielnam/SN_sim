@@ -102,11 +102,11 @@ def clockanddatacalc_func(data_type_keys, data_age_by_type, env, sensor_array_qu
 
     calc_ages(data_type_keys, data_age_by_type, env, sensor_array_queue, array_analysis_queue, analysis_array_queue,
               array_action_queue, action_array_queue, array_sensor_queue, data_age)
+    calculate_number_of_objects(number_of_sensors, env, sensor_list, agent_flow_rates_by_type, array, analysis_station,
+                                action_station, total_resource)
     calc_self_org_over_time(self_organization_measure, env, dt, agent_flow_rates_by_type, number_of_sensors,
                             timestep_list)
     calc_success_over_time(successful_operations_total, env, successful_operations, dt)
-    calculate_number_of_objects(number_of_sensors, env, sensor_list, agent_flow_rates_by_type, array, analysis_station,
-                                action_station, total_resource)
 
 
 def calc_average_stdev(success_vs_self_org_dict):
