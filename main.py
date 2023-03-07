@@ -14,8 +14,8 @@ import os
 ui = False
 print_excel = False
 
-end_time = 100
-number_of_iterations = 2
+end_time = 1000
+number_of_iterations = 6
 max_resource = 50
 dt = 5
 success_vs_self_org_dict = {}
@@ -32,6 +32,7 @@ def memory_check():
 
 def work(sim_coll, ind, dt):
     DC.run_simulation(sim_coll, ind, ui, print_excel, end_time, max_resource, dt)
+    memory_check()
 
 
 if __name__ == '__main__':
@@ -45,7 +46,6 @@ if __name__ == '__main__':
             target=work,
             args=(simulation_collector, i, dt)
         )
-        memory_check()
         processes.append(p)
         p.start()
 

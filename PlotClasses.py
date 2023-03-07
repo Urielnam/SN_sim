@@ -92,7 +92,7 @@ def multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_
 
     plot_all_success(simulation_collector)
 
-    # plot_self_org_with_flow_data(0, simulation_collector)
+    plot_self_org_with_flow_data(0, simulation_collector)
 
     plt.show()
 
@@ -139,19 +139,31 @@ def plot_self_org_with_flow_data(run_num, simulation_collector):
     axis[0].plot([a for (t, a) in simulation_collector["run #" + str(run_num)]['self_organization_measure'].items()])
 
     bottom = [0]*len(x)
+    temp = simulation_collector.copy()
     for key in simulation_collector["run #" + str(run_num)]['agent_flow_rates_by_type'].keys():
-        measure = [simulation_collector["run #" + str(run_num)]['agent_flow_rates_by_type'][key][x[j]] !=
-                   simulation_collector["run #" + str(run_num)]['agent_flow_rates_by_type'][key][x[j-1]] for
-                   j in range(1, len(simulation_collector["run #" + str(run_num)]['agent_flow_rates_by_type'][key]))]
-        measure.insert(0, 0)
+        """
+        for every agent type:
+        check if value at time step j is different in j-1 for all j in that specific key.
+        """
+        original_array = np.array(list(simulation_collector["run #" + str(run_num)]['agent_flow_rates_by_type'][key].values())[1:])
+        shifted_array = np.array(list(simulation_collector["run #" + str(run_num)]['agent_flow_rates_by_type'][key].values())[:-1])
+        measure = original_array != shifted_array
+
+        # measure = [simulation_collector["run #" + str(run_num)]['agent_flow_rates_by_type'][key][x[j]] !=
+        #            simulation_collector["run #" + str(run_num)]['agent_flow_rates_by_type'][key][x[j-1]] for
+        #            j in range(1, len(simulation_collector["run #" + str(run_num)]['agent_flow_rates_by_type'][key]))]
+        measure = np.insert(measure, 0, False)
         axis[1].bar(x, measure, bottom=bottom, width=0.1)
         axis[1].legend(key, loc="upper right")
         bottom = [bottom[i] + measure[i] for i in range(len(bottom))]
 
-    measure = [simulation_collector["run #" + str(run_num)]['number_of_sensors'][x[j]] !=
-               simulation_collector["run #" + str(run_num)]['number_of_sensors'][x[j-1]] for
-               j in range(1, len(simulation_collector["run #" + str(run_num)]['number_of_sensors']))]
-    measure.insert(0, 0)
+    original_array = np.array(list(simulation_collector["run #" + str(run_num)]['number_of_sensors'].values())[1:])
+    shifted_array = np.array(list(simulation_collector["run #" + str(run_num)]['number_of_sensors'].values())[:-1])
+    measure = original_array != shifted_array
+    # measure = [simulation_collector["run #" + str(run_num)]['number_of_sensors'][x[j]] !=
+    #            simulation_collector["run #" + str(run_num)]['number_of_sensors'][x[j-1]] for
+    #            j in range(1, len(simulation_collector["run #" + str(run_num)]['number_of_sensors']))]
+    measure = np.insert(measure, 0, False)
     axis[1].bar(x, measure, bottom=bottom, width=0.1)
     axis[1].legend("Sensors", loc="upper right")
 
