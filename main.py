@@ -15,9 +15,11 @@ ui = False
 print_excel = False
 
 end_time = 1000
-number_of_iterations = 6
+number_of_iterations = 1
 max_resource = 50
 dt = 5
+self_org_feedback_activate = True
+threshold_self_org_value = 10
 success_vs_self_org_dict = {}
 success_vs_self_org_dict = {'total': {}}
 
@@ -31,7 +33,8 @@ def memory_check():
 
 
 def work(sim_coll, ind, dt):
-    DC.run_simulation(sim_coll, ind, ui, print_excel, end_time, max_resource, dt)
+    DC.run_simulation(sim_coll, ind, ui, print_excel, end_time, max_resource, dt, self_org_feedback_activate,
+                      threshold_self_org_value)
     memory_check()
 
 

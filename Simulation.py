@@ -32,7 +32,7 @@ class Data:
 # data to include
 # all plotted data - need to check how it's done maybe?
 
-def main_run(ui, print_excel, end_time, max_resource, dt):
+def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_activate, threshold_self_org_value):
     if ui:
         import UIClasses
     # declare all required dictionaries so they can be deleted at the end of the run
@@ -303,6 +303,8 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
         sensor_list.remove(sensor)
 
     # we need to select how much we change the number of sensors, and then execute it.
+
+
     def sensor_maker(external_environemnt, array, analysis_station, action_station):
         sensor_number = 2
 
@@ -350,6 +352,27 @@ def main_run(ui, print_excel, end_time, max_resource, dt):
             if not check_max_resource(array, analysis_station, action_station) and len(sensor_list) > 1:
                 selected_sensor = random.choice(sensor_list)
                 kill_sensor(selected_sensor)
+
+            if self_org_feedback_activate:
+                """
+                main goal - if self-org is less than 10, have every agent type "vibrate".
+                check if condition is applied.
+                check if self_org is less than 10 (ampiric)
+                check if equal to last step.
+                try to increase (enough resources?)
+                if not enough resources
+                try to decrease (enough spare to decrease?)
+                if failed - do nothing.
+                """
+                if len(self_organization_measure) > 5:
+                    if list(self_organization_measure)[-1] < threshold_self_org_value:
+                        if len(sensor_list) == list(number_of_sensors.values())[-1][0]:
+                            if check_max_resource(array, analysis_station, action_station):
+                                sensor_number = create_new_sensor(sensor_number, external_environemnt)
+                            else:
+                                if len(sensor_list) > 1:
+                                    removed_sensor = random.choice(sensor_list.copy())
+                                    kill_sensor(removed_sensor)
 
             yield external_environemnt.timeout(0.1)
 
