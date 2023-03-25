@@ -15,10 +15,10 @@ ui = False
 print_excel = False
 
 end_time = 1000
-number_of_iterations = 1
+number_of_iterations = 4
 max_resource = 50
 dt = 5
-self_org_feedback_activate = True
+self_org_feedback_activate = False
 threshold_self_org_value = 10
 success_vs_self_org_dict = {}
 success_vs_self_org_dict = {'total': {}}

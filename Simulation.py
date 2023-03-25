@@ -364,8 +364,8 @@ def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_acti
                 try to decrease (enough spare to decrease?)
                 if failed - do nothing.
                 """
-                if len(self_organization_measure) > 5:
-                    if list(self_organization_measure)[-1] < threshold_self_org_value:
+                if len(self_organization_measure) > 600:
+                    if list(self_organization_measure.values())[-1][0] < threshold_self_org_value:
                         if len(sensor_list) == list(number_of_sensors.values())[-1][0]:
                             if check_max_resource(array, analysis_station, action_station):
                                 sensor_number = create_new_sensor(sensor_number, external_environemnt)
@@ -376,6 +376,20 @@ def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_acti
 
             yield external_environemnt.timeout(0.1)
 
+    # same as previous logic, only with general object
+    # object could be array, analysis station or action upgrade
+    def increase_self_org(object, object_name):
+
+        if self_org_feedback_activate:
+            if len(self_organization_measure) > 600:
+                if list(self_organization_measure.values())[-1][0] < threshold_self_org_value:
+                    if object.flow_rate == list(agent_flow_rates_by_type[object_name].values())[-1]:
+                        if check_max_resource(array, analysis_station, action_station):
+                            object.flow_rate = object.flow_rate + 1
+                        else:
+                            if object.flow_rate > 1:
+                                object.flow_rate = object.flow_rate - 1
+
     def array_upgrade(env, array, analysis_station, action_station):
         while True:
             if check_queue() < (array.flow_rate - 1) * 5 and array.flow_rate > 1:
@@ -383,6 +397,7 @@ def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_acti
             if check_max_resource(array, analysis_station, action_station):
                 while check_queue() > array.flow_rate * 5:
                     array.flow_rate = array.flow_rate + 1
+            increase_self_org(array, "Array")
             yield env.timeout(0.1)
 
     def analysis_upgrade(env, analysis_station, array, action_station):
@@ -392,6 +407,7 @@ def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_acti
             if check_max_resource(array, analysis_station, action_station):
                 while len(array_analysis_queue) > analysis_station.flow_rate * 5:
                     analysis_station.flow_rate = analysis_station.flow_rate + 1
+            increase_self_org(analysis_station, "Analysis Station")
             yield env.timeout(0.1)
 
     def action_upgrade(env, action_station, array, analysis_station):
@@ -401,6 +417,7 @@ def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_acti
             if check_max_resource(array, analysis_station, action_station):
                 while len(array_action_queue) > action_station.flow_rate * 5:
                     action_station.flow_rate = action_station.flow_rate + 1
+            increase_self_org(action_station, "Action Station")
             yield env.timeout(1.1)
 
     # original function

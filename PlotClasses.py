@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from Simulation import data_type_keys
 import random
+import statistics
 
 
 # draw the graph for a single run.
@@ -118,11 +119,29 @@ def plot_all_success(simulation_collector):
     plt.figure()
     plt.title("Cummulative Success")
 
-    for run_num in simulation_collector:
-        x = simulation_collector[run_num]["successful_operations"]
-        y = [i+1 for i in range(len(x))]
+    # old code for plotting the entire cummulative success graph.
+    # for run_num in simulation_collector:
+    #     x = simulation_collector[run_num]["successful_operations"]
+    #     y = [i+1 for i in range(len(x))]
+    #
+    #     plt.plot(x, y, label=run_num)
 
-        plt.plot(x, y, label=run_num)
+
+    x = []
+    y = []
+    for run_num in simulation_collector:
+
+        x.append((sum([item for sublist in list(simulation_collector[run_num]["total_resource"].values())
+                       for item in sublist])))
+        y.append(len(simulation_collector[run_num]["successful_operations"]))
+
+
+    x1 = statistics.mean(x)
+    y1 = statistics.mean(y)
+
+    plt.scatter(x, y, label = "specific run sucess")
+    plt.scatter(x1, y1, label = "average")
+
 
     plt.legend()
 
