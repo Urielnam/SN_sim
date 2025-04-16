@@ -139,6 +139,7 @@ def plot_all_success(simulation_collector):
     x1 = statistics.mean(x)
     y1 = statistics.mean(y)
 
+    print(x,",",y)
     plt.scatter(x, y, label = "specific run sucess")
     plt.scatter(x1, y1, label = "average")
 

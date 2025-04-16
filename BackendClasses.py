@@ -12,6 +12,57 @@ def add_to_dict_arr(dic, key, val):
     else:
         dic[key] = [val]
 
+def calc_self_org_vectorized(dt, agent_flow_rates_by_type, number_of_sensors, env, timestep_list):
+    """
+        Calculates self-organization using vectorized numpy operations.
+
+        Args:
+            dt: Time step.
+            agent_flow_rates_by_type: Dictionary of agent flow rates.
+            number_of_sensors: Dictionary of sensor counts.
+            env: Simulation environment.
+            timestep_list: List of time steps.
+
+        Returns:
+            The total self-organization measure.
+    """
+
+
+    # need to find a way to limit the comparison (it runs too long...)
+
+    changes_by_key = []
+    timestep_limit = len(timestep_list)
+
+
+    for key_n in agent_flow_rates_by_type.keys():
+        flow_rates = np.array(list(agent_flow_rates_by_type[key_n].values()))
+        # next step limits the flow rates to the timestep limit
+        flow_rates = flow_rates[-timestep_limit:]
+        # handle the cases where timestep_limit is less than 2
+        if len(flow_rates) < 2:
+            changes_by_key.append(0)
+        else:
+            # Shift the array to compare adjacent values
+            shifted_flow_rates = np.roll(flow_rates, 1)
+            shifted_flow_rates[0]  = flow_rates[0] # Handle the first element
+            changes = np.sum(flow_rates != shifted_flow_rates)
+            changes_by_key.append(changes)
+            # print(changes)
+
+
+    sensor_counts = np.array(list(number_of_sensors.values()))
+    # limit the sensor count to the timestep limit
+    sensor_counts = sensor_counts[:timestep_limit]
+    if len(sensor_counts) < 2:
+        changes_by_key.append(0)
+    else:
+        shifted_sensor_counts = np.roll(sensor_counts, 1)
+        shifted_sensor_counts[0] = sensor_counts[0]
+        sensor_changes = np.sum(sensor_counts != shifted_sensor_counts)
+        changes_by_key.append(sensor_changes)
+
+    return np.sum(changes_by_key)
+
 
 def calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env, timestep_list):
     changes_by_key = []
@@ -49,8 +100,11 @@ def calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env, timestep
 # calculate system self organization over time (for a2).
 def calc_self_org_over_time(self_organization_measure, env, dt, agent_flow_rates_by_type, number_of_sensors,
                             timestep_list):
+    # old function without numpy
     result_self_org = calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env, timestep_list)
-    add_to_dict_arr(self_organization_measure, float(env.now), result_self_org) 
+    # new function with numpy
+    #result_self_org = calc_self_org_vectorized(dt, agent_flow_rates_by_type, number_of_sensors, env, timestep_list)
+    add_to_dict_arr(self_organization_measure, float(env.now), result_self_org)
 
 
 # calculate data type age over time (for a1).

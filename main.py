@@ -2,6 +2,11 @@
 Runs the simulation with selected parameters
 (maybe later decides on the parameters?)
 starts file Simulation.py
+required libraries:
+    matplotlib
+    simpy
+    psutil
+    pandas
 """
 
 import PlotClasses
@@ -16,12 +21,13 @@ print_excel = False
 
 end_time = 1000
 number_of_iterations = 4
-max_resource = 50
+max_resource = 100
 dt = 5
 self_org_feedback_activate = False
-threshold_self_org_value = 10
+threshold_self_org_value = 35
 success_vs_self_org_dict = {}
 success_vs_self_org_dict = {'total': {}}
+sensor_acc = 0.1
 
 # we can run the simulation multiple times and then show the self-org/accumulated success for each
 # separately and together
@@ -34,7 +40,7 @@ def memory_check():
 
 def work(sim_coll, ind, dt):
     DC.run_simulation(sim_coll, ind, ui, print_excel, end_time, max_resource, dt, self_org_feedback_activate,
-                      threshold_self_org_value)
+                      threshold_self_org_value, sensor_acc)
     memory_check()
 
 

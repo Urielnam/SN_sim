@@ -32,7 +32,7 @@ class Data:
 # data to include
 # all plotted data - need to check how it's done maybe?
 
-def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_activate, threshold_self_org_value):
+def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_activate, threshold_self_org_value,sensor_acc):
     if ui:
         import UIClasses
     # declare all required dictionaries so they can be deleted at the end of the run
@@ -203,7 +203,7 @@ def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_acti
     def check_queue():
         return len(sensor_array_queue) + len(analysis_array_queue) + len(action_array_queue)
 
-    # need to create analysis station, then action station and then start messing with accuricy.
+    # need to create analysis station, then action station and then start messing with accuracy.
     # if one of the intel is true, the intel is correct and the boogie is found. if both are false, the attack failes.
     # I need to change it so it ingests one intel article per cycle.
     class AnalysisStation(object):
@@ -292,7 +292,8 @@ def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_acti
 
     def create_new_sensor(sensor_number, external_environemnt):
         # set a random number for the chances of giving good info.
-        sensor_chance = random.random()
+        # sensor accuracy = sensor_acc.
+        sensor_chance = sensor_acc*random.random()
         # add new sensor
         sensor_list.append(Sensor(sensor_chance, sensor_number, external_environemnt))
         # increase sensor count
