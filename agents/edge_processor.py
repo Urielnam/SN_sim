@@ -1,4 +1,4 @@
-import UIClasses, random
+import random
 from agents.data_packet import DataPacket
 
 # need to create edge processor station, then scada actuator and then start messing with accuracy.
@@ -9,17 +9,12 @@ class EdgeProcessor(object):
         self.ctx = ctx
         self.env = ctx.env
         self.action = ctx.env.process(self.run())
-        self.ui_flag = ctx.config.ui
         self.flow_rate = 1
-
-        if self.ui_flag:
-            self.draw = UIClasses.EdgeStationDraw()
 
     def run(self):
         bank_size =2
 
         while True:
-
             # 1. WAIT
             # The process freezes here. It only wakes up when the Bus delivers a packet to 'bus_edge_queue'.
             moved_item = yield self.ctx.bus_edge_queue.get()
@@ -27,15 +22,14 @@ class EdgeProcessor(object):
             # record metrics
             self.ctx.edge_data_usage_time.append(self.env.now - moved_item.time)
 
-            # UI visualization
-            if self.ui_flag:
-                self.draw.run_draw(moved_item)
+            # OBSERVER HOOK: Announce processing start
+            self.ctx.on_event("edge_process_start", moved_item)
 
             # 2. PROCESS (Simulate Latency)
             yield self.env.timeout(1/self.flow_rate)
 
-            if self.ui_flag:
-                self.draw.run_delete()
+            # OBSERVER HOOK: Announce processing end
+            self.ctx.on_event("edge_process_end", moved_item)
 
             # 3. LOGIC
             if moved_item.type == 'feedback':

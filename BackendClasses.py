@@ -1,6 +1,8 @@
 import numpy as np
 from statistics import mean, stdev
 import bisect
+import os
+import pandas as pd
 
 # old not-optimized function, when end_time = 1000, iterations = 5, resource = 100 and dt = 5 it took 444s out of a
 # total of 626s
@@ -183,3 +185,51 @@ def prepare_timestep_list(ctx):
         ctx.timestep_list.pop(0)
     ctx.timestep_list.append(float(ctx.env.now))
 
+
+# -------------------------
+# UTILITIES
+# -------------------------
+def create_folder(name, now):
+    """
+    Creates a time-stamped directory structure: sim_data/timestamp/name
+    """
+    ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+    top_folder = os.path.join(ROOT_DIR, "sim_data")
+    create_folder_path(top_folder)
+
+    date_folder = os.path.join(top_folder, now)
+    create_folder_path(date_folder)
+
+    DATA_DIR = os.path.join(date_folder, name)
+    create_folder_path(DATA_DIR)
+
+    return DATA_DIR
+
+
+def create_folder_path(path):
+    if not os.path.exists(path):
+        os.mkdir(path)
+
+
+def export_to_excel(simulation_data, timestamp_str):
+    """
+    Exports the collected simulation data to Excel files.
+    """
+    try:
+        # Create the directory
+        save_path = create_folder("excels", timestamp_str)
+
+        for key, data_list in simulation_data.items():
+            # Skip non-serializable objects if any
+            if isinstance(data_list, (dict, list)):
+                try:
+                    df = pd.DataFrame(data=data_list)
+                    excel_name = os.path.join(save_path, f"{key}.xlsx")
+                    df.to_excel(excel_name, index=False)
+                except Exception as e:
+                    print(f"Skipping export for {key}: {e}")
+
+        print(f"Data exported to: {save_path}")
+
+    except Exception as e:
+        print(f"Export failed: {e}")

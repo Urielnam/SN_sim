@@ -1,7 +1,4 @@
 # The network bus moves data between different queues. It can move only one object per lane.
-from simpy import PriorityItem
-
-import UIClasses, random
 
 def check_queue(ctx):
     return len(ctx.iiot_bus_queue) + len(ctx.edge_bus_queue) + len(ctx.scada_bus_queue)
@@ -11,26 +8,9 @@ class NetworkBus(object):
         self.ctx = ctx
         self.env = ctx.env
         self.action = self.env.process(self.run())
-        self.ui_flag = ctx.config.ui
 
         self.flow_rate = 1
 
-        if self.ui_flag:
-            self.arr = UIClasses.BusDraw()
-
-    def move_item(self, queue_from, queue_to):
-        moved_item = queue_from[0]
-        queue_from.pop(0)
-        # # draw inside box
-        if self.ui_flag:
-            self.arr.arr_move_item(moved_item)
-
-        yield self.env.timeout(1 / self.flow_rate)
-
-        if self.ui_flag:
-            self.arr.arr_clear_item()
-
-        queue_to.append(moved_item)
 
     def run(self):
 
@@ -42,12 +22,14 @@ class NetworkBus(object):
             # Unwrap to get the item from simpy PriorityItem object
             packet = wrapper.item
 
-
+            # OBSERVER HOOK: Announce transport start
+            self.ctx.on_event("bus_transport_start", packet)
 
             # 2. TRANSPORT DELAY: Simulate the time it takes to move data based on the bus 'flow rate' (Bandwidth).
             yield self.env.timeout(1 / self.flow_rate)
 
-
+            # OBSERVER HOOK: Announce transport end
+            self.ctx.on_event("bus_transport_end", packet)
 
             # 3. ROUTE: Determine the destination and deliver.
             self._route_packet(packet)

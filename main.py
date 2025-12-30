@@ -25,7 +25,7 @@ RUN_PARAMS = {
     "iiot_acc": 0.6,
     "self_org_active": False,
     "self_org_threshold": 35,
-    "ui": False,
+    "ui": True,
     "print_excel": False
 }
 

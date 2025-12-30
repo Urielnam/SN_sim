@@ -3,9 +3,8 @@ import random
 import pandas as pd
 from datetime import datetime
 
-
-from agents import IIoTNode, NetworkBus, check_queue, EdgeProcessor, SCADAActuator
-from BackendClasses import clockanddatacalc_func
+from agents import IIoTNode, NetworkBus, EdgeProcessor, SCADAActuator
+from BackendClasses import clockanddatacalc_func, export_to_excel
 from sim_context import SimulationContext
 import UIClasses
 
@@ -19,19 +18,18 @@ import UIClasses
 
 def main_run(config):
 
-    now = datetime.now().ctime()
-    now = now.replace(":", "_")
+    now = datetime.now().ctime().replace(":", "_")
 
-    def create_clock(ctx, bus, edge, scada, clock, UI_obj):
-        # This generator is meant to be used as a SimPy event to update the clock and the data in the UI
-
+    def metric_monitor(ctx, bus, edge, scada, visualizer=None):
         while True:
             yield ctx.env.timeout(0.1)
+
+            # Calculate Stats
             clockanddatacalc_func(ctx, bus, edge, scada)
 
-            if config.ui:
-                clock.tick(ctx.env.now)
-                UI_obj.tick()
+            # Update UI if active
+            if visualizer:
+                visualizer.tick()
 
     def check_max_resource(ctx, bus, edge, scada):
         return (len(ctx.iiot_list) + bus.flow_rate +
@@ -181,53 +179,61 @@ def main_run(config):
 
             increase_self_org(ctx, scada, "SCADA Actuator")
 
-
-    # original function
-    clock = {}
-    UI_obj = {}
-
+    # 3. Setup Environment
     if config.ui:
+        # Realtime for visualization
         env = simpy.rt.RealtimeEnvironment(factor=0.1, strict=False)
-        ctx = SimulationContext(env, config)
-
-        UI_obj = UIClasses.PaintGrapic(
-            ctx.iiot_bus_queue,
-            ctx.bus_iiot_queue,
-            ctx.bus_edge_queue,
-            ctx.edge_sublist,
-            ctx.edge_bus_queue,
-            ctx.bus_scada_queue,
-            ctx.scada_bus_queue)
-
-        clock = UIClasses.ClockAndDataDraw(ctx,1100, 260, 1290, 340, 0)
-
     else:
-        # do not remove, it's a faster env function:
         env = simpy.Environment()
-        ctx = SimulationContext(env, config)
 
+    ctx = SimulationContext(env, config)
 
+    # 4. Instantiate Visualizer (If UI is True)
+    vis = None
+    if config.ui:
+        vis = UIClasses.Visualizer(ctx)
 
+    # 5.Instantiate Agents
     bus = NetworkBus(ctx)
     scada = SCADAActuator(ctx)
     edge = EdgeProcessor(ctx)
 
-    env.process(create_clock(ctx, bus, edge, scada, clock, UI_obj))
+    # Initial IIoT
+    ctx.iiot_list.append(IIoTNode(ctx, 0.5, 1))
 
-    ctx.iiot_list.append(IIoTNode(ctx,0.5, 1))
+   # 6. Start Processes
+    env.process(metric_monitor(ctx, bus, edge, scada, vis))
     env.process(iiot_maker(ctx, bus, edge, scada))
     env.process(bus_upgrade(ctx, bus, edge, scada))
     env.process(edge_upgrade(ctx, edge, bus, scada))
     env.process(scada_upgrade(ctx, scada, bus, edge))
 
-    if config.ui:
-        env.process(UIClasses.save_graph(ctx, now))
-
-    env.run(until=config.end_time)
+    # 7. Run Simulation
+    print(f"--- Starting Run (UI={config.ui}) ---")
 
     if config.ui:
-        UIClasses.main.mainloop()
+        # If UI is on, we cannot use env.run(until=X) directly because
+        # Tkinter needs the main thread.
 
+        # We define a closer to stop the loop
+        def close_sim():
+            if env.now < config.end_time:
+                try:
+                    env.step()
+                    vis.root.after(1, close_sim)  # Loop 1ms
+                except simpy.core.EmptySchedule:
+                    vis.root.quit()
+            else:
+                vis.save_snapshot(now)  # <--- Auto-save at end
+                vis.root.quit()
+
+        vis.root.after(0, close_sim)
+        vis.start()  # Blocking call for Tkinter
+    else:
+        # Headless mode
+        env.run(until=config.end_time)
+
+    # 8. Export Data
     local_simulation_collector = {
         "data_age": ctx.data_age,
         "data_age_by_type": ctx.data_age_by_type,
@@ -240,19 +246,10 @@ def main_run(config):
         "last dt timesteps": ctx.timestep_list
     }
 
-    def print_to_file(local_simulation_collector):
-        # convert into dataframe
-        path = UIClasses.create_folder("excels", now)
-        for val in local_simulation_collector:
-            df = pd.DataFrame(data=local_simulation_collector[val])
-            # df = df.T
-            # convert into excel
-            excel_name = path + "\\" + val + ".xlsx"
-            df.to_excel(excel_name, index=False)
-
-
     if config.print_excel:
-        print_to_file(local_simulation_collector)
+        # Use BackendClasses to export
+        export_to_excel(local_simulation_collector, now)
+
     return local_simulation_collector
 
 

@@ -10,16 +10,21 @@ class SCADAActuator(object):
 
     def run(self):
         while True:
-
             # 1. WAIT
             # Sleep until the Bus delivers a 'Target' packet
             target_packet = yield self.ctx.bus_scada_queue.get()
+
+            # OBSERVER HOOK: Announce actuation start
+            self.ctx.on_event("scada_actuate_start", target_packet)
 
             # Record metrics (Latency calculation)
             self.ctx.scada_data_usage_time.append(self.env.now - target_packet.time)
 
             # 2. Actuate
             yield self.env.timeout(1 / self.flow_rate)
+
+            # OBSERVER HOOK: Announce actuation end
+            self.ctx.on_event("scada_actuate_end", target_packet)
 
             # 3. FEEDBACK GENERATION
             # Determine if the operation was a success based on the packet's truth value

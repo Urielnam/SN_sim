@@ -2,341 +2,309 @@ import tkinter as tk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import numpy as np
-import csv
-import os
+import BackendClasses
 
 
-main = tk.Tk()
-main.title("ISR Simulation")
-main.config(bg="#fff")
-logo = tk.PhotoImage(file="images/title.png")
-top_frame = tk.Frame(main)
-top_frame.pack(side=tk.TOP, expand= False)
-tk.Label(top_frame, image=logo, bg= "#000007", height=65, width=1300).pack(side=tk.LEFT, expand=False)
-canvas = tk.Canvas(main, width=1300, height= 350, bg="white")
-canvas.pack(side=tk.TOP, expand=False)
+# UIClasses.py
+# Refactored for Event-Driven Architecture (SimPy)
 
-f = plt.Figure(figsize=(2, 2), dpi=72)
-a3 = f.add_subplot(121)
-a3.plot()
-a1 = f.add_subplot(222)
-a1.plot()
-a2 = f.add_subplot(224)
-a2.plot()
+class Visualizer:
+    """
+    The main UI controller. It owns the Tkinter root, manages subscriptions to
+    simulation events, and triggers periodic updates for queues and graphs.
+    """
 
-start_row = 95
-regular_height = 30
+    def __init__(self, ctx):
+        self.ctx = ctx
 
-image_map2 = {
-    "intel": tk.PhotoImage(file="images/folder.png"),
-    "feedback": tk.PhotoImage(file="images/feedback.png"),
-    "target": tk.PhotoImage(file="images/target.png")
-}
+        # 1. Initialize Tkinter Root (Encapsulated)
+        self.root = tk.Tk()
+        self.root.title("ISR Simulation - Event Driven")
+        self.root.config(bg="#fff")
 
+        # 2. Load Assets
+        self._load_images()
 
-class BusDraw:
-    def __init__(self):
-        self.item_presentation = []
-        self.x = 5
-        self.y = 20
-        self.canvas = canvas
-        self.presentation = IsrElement("Network Bus", self.x, self.y, 1290, start_row-30)
+        # 3. Setup Layout
+        self._setup_layout()
 
-    def arr_move_item(self, moved_item):
-        # draw inside box
-        self.item_presentation.append(
-            self.canvas.create_image(self.x + 100, self.y, anchor=tk.NW, image=image_map2[moved_item.type])
-        )
-        self.item_presentation.append(self.canvas.create_text(self.x + 100, self.y + 30, anchor=tk.NW,
-                                                              text=moved_item.id))
+        # 4. Initialize Sub-Components
+        # Animators (Respond to Events)
+        self.bus_animator = BusAnimator(self.canvas, self.image_map)
+        self.edge_animator = EdgeAnimator(self.canvas, self.image_map)
 
-        self.canvas.update()
+        # Queue Inspectors (Respond to Ticks)
+        self.queues = self._init_queues()
 
-    def arr_clear_item(self):
-        for i in self.item_presentation:
-            to_del = self.item_presentation.pop()
-            self.canvas.delete(to_del)
-            self.canvas.update()
+        # Graphs & Clock (Respond to Ticks)
+        self.dashboard = Dashboard(self.ctx, self.canvas, self.graph_frame)
 
+        # 5. Subscribe to Simulation Events (The Observer Pattern)
+        # This overwrites the empty hook in SimulationContext
+        self.ctx.on_event = self.handle_event
 
-class IsrElement:
-    text_height = 30
-    icon_top_margin = -8
+    def _load_images(self):
+        """Loads images once to be shared across components."""
+        try:
+            self.logo_img = tk.PhotoImage(file="images/title.png")
+            self.image_map = {
+                "intel": tk.PhotoImage(file="images/folder.png"),
+                "feedback": tk.PhotoImage(file="images/feedback.png"),
+                "target": tk.PhotoImage(file="images/target.png")
+            }
+        except Exception as e:
+            print(f"Warning: Could not load images. UI may look broken. {e}")
+            self.logo_img = None
+            self.image_map = {}
 
-    def __init__(self, element_name, x_top, y_top, length, height):
-        self.element_name = element_name
-        self.x_top = x_top
-        self.y_top = y_top
-        self.length = length
-        self.canvas = canvas
+    def _setup_layout(self):
+        # Top Frame (Logo)
+        top_frame = tk.Frame(self.root)
+        top_frame.pack(side=tk.TOP, expand=False)
+        if self.logo_img:
+            tk.Label(top_frame, image=self.logo_img, bg="#000007", height=65, width=1300).pack(side=tk.LEFT)
 
-        canvas.create_rectangle(x_top, y_top, x_top + length, y_top + height)
-        canvas.create_text(x_top + 10, y_top + 7, anchor=tk.NW, text=f"{element_name}")
-        self.canvas.update()
+        # Middle Frame (Canvas for Animation)
+        self.canvas = tk.Canvas(self.root, width=1300, height=350, bg="white")
+        self.canvas.pack(side=tk.TOP, expand=False)
+
+        # Bottom Frame (Graphs)
+        self.graph_frame = tk.Frame(self.root)
+        self.graph_frame.pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
+
+    def _init_queues(self):
+        """Initializes the static queue visualizations."""
+
+        # Helper to make code cleaner
+        def make_q(selector, name, x):
+            return QueueGraphics(self.ctx, self.canvas, self.image_map, selector, name, x)
+
+        return [
+            make_q("iiot_to_bus", "IIoT to \n Network Bus", 100),
+            make_q("bus_to_iiot", "Network Bus to \n IIoT", 200),
+            make_q("bus_to_edge", "Network Bus to \n Edge Processor", 300),
+            make_q("edge_buffer", "Edge Processor \n Bank", 600),
+            make_q("edge_to_bus", "Edge Processor to \n Network Bus", 700),
+            make_q("bus_to_scada", "Network Bus to \n SCADA Actuator", 800),
+            make_q("scada_to_bus", "SCADA Actuator to \n Network Bus", 900)
+        ]
+
+    def handle_event(self, event_type, payload):
+        """
+        The Observer Hook. Called by agents when something happens.
+        """
+        if event_type == "bus_transport_start":
+            self.bus_animator.animate_start(payload)
+
+        elif event_type == "bus_transport_end":
+            self.bus_animator.animate_end()
+
+        elif event_type == "edge_process_start":
+            self.edge_animator.animate_start(payload)
+
+        elif event_type == "edge_process_end":
+            self.edge_animator.animate_end()
+
+    def tick(self):
+        """
+        Called every time step by the Simulation clock loop.
+        Updates the static state (queues, graphs, clock).
+        """
+        # Update all queue visualizers (Inspector)
+        for q in self.queues:
+            q.paint_queue()
+
+        # Update graphs and clock text
+        self.dashboard.tick()
+
+        # Refresh UI
+        self.root.update()
+
+    def start(self):
+        self.root.mainloop()
+
+    def save_snapshot(self, timestamp_str):
+        """
+        Saves the current state of the Dashboard figure to an SVG file.
+        """
+        try:
+            # 1. Generate Path using the utility in BackendClasses
+            folder_name = "visual_snapshots"
+            save_dir = BackendClasses.create_folder(folder_name, timestamp_str)
+
+            # 2. Construct Filename
+            # We use the simulation time or just a counter
+            filename = f"snapshot_T{int(self.ctx.env.now)}.svg"
+            full_path = os.path.join(save_dir, filename)
+
+            # 3. Save the Figure (accessed via the Dashboard)
+            self.dashboard.fig.savefig(full_path)
+            print(f"Snapshot saved: {full_path}")
+
+        except Exception as e:
+            print(f"Failed to save snapshot: {e}")
 
 
 class QueueGraphics:
-    text_height = 30
-    icon_top_margin = -8
+    """
+    Visualizes the contents of a SimPy Queue (Inspector).
+    Uses ctx.get_queue_snapshot() to inspect state without breaking encapsulation.
+    """
 
-    def __init__(self, data_container, icon_height, data_name, x_top):
-        # self.icon_file = icon_file
-        self.icon_height = icon_height
-        self.queue_name = data_name
+    def __init__(self, ctx, canvas, image_map, selector, name, x_top):
+        self.ctx = ctx
         self.canvas = canvas
+        self.image_map = image_map
+        self.selector = selector  # String ID used to ask Context for data
         self.x_top = x_top
-        self.y_top = start_row
+        self.y_top = 95  # start_row
 
-        # self.image = tk.PhotoImage(file = self.icon_file)
         self.icons = []
-        self.data_contained = data_container
-        canvas.create_text(self.x_top, self.y_top, anchor = tk.NW, text = f"{data_name}")
-        self.canvas.update()
+
+        # Draw Title
+        self.canvas.create_text(self.x_top, self.y_top, anchor=tk.NW, text=name)
 
     def paint_queue(self):
-        # delete all current representations
-        for i in self.icons:
-            to_del = self.icons.pop()
-            self.canvas.delete(to_del)
-            self.canvas.update()
-        # redraw for all current items contained
+        # 1. Clear old icons
+        for icon in self.icons:
+            self.canvas.delete(icon)
+        self.icons.clear()
+
+        # 2. Fetch Fresh Data (The Snapshot)
+        packet_list = self.ctx.get_queue_snapshot(self.selector)
+
+        # 3. Draw
         x = self.x_top + 15
         y = self.y_top + 45
+        icon_height = 25
 
-        for i in self.data_contained:
-            self.icons.append(
-                self.canvas.create_image(x, y, anchor = tk.NW, image = image_map2[i.type])
-            )
-            self.icons.append(self.canvas.create_text(x - 10, y + 30, anchor = tk.NW, text = i.id))
-            y = y + self.icon_height + 45
-        self.canvas.update()
+        for packet in packet_list:
+            # Safe access to packet attributes
+            if packet.type in self.image_map:
+                img_id = self.canvas.create_image(x, y, anchor=tk.NW, image=self.image_map[packet.type])
+                txt_id = self.canvas.create_text(x - 10, y + 30, anchor=tk.NW, text=packet.id)
+                self.icons.extend([img_id, txt_id])
+
+            y = y + icon_height + 45
 
 
-class PaintGrapic:
+class BusAnimator:
+    """Handles the animation of items moving across the bus."""
 
-    def __init__(
-            self,
-            iiot_bus_queue,
-            bus_iiot_queue,
-            bus_edge_queue,
-            edge_sublist,
-            edge_bus_queue,
-            bus_scada_queue,
-            scada_bus_queue
-            ):
-        self.iiot_bus = QueueGraphics(iiot_bus_queue, 25, "IIoT to \n Network Bus", 100)
-        self.bus_iiot = QueueGraphics(bus_iiot_queue, 25, "Network Bus to \n IIoT", 200)
-        self.bus_edge = QueueGraphics(bus_edge_queue, 25, "Network Bus to \n Edge Processor", 300)
-        self.edge_sublist_visual = QueueGraphics(edge_sublist, 25, "Edge Processor \n Bank", 600)
-        self.edge_bus = QueueGraphics(edge_bus_queue, 25, "Edge Processor to \n Network Bus", 700)
-        self.bus_scada = QueueGraphics(bus_scada_queue, 25, "Network Bus to \n SCADA Actuator", 800)
-        self.scada_bus = QueueGraphics(scada_bus_queue, 25, "SCADA Actuator to \n Network Bus", 900)
+    def __init__(self, canvas, image_map):
+        self.canvas = canvas
+        self.image_map = image_map
+        self.active_items = []
+        self.x = 105
+        self.y = 20
+
+        # Draw the Bus Line
+        # IsrElement("Network Bus", 5, 20, 1290, 65) roughly
+        self.canvas.create_rectangle(5, 20, 1295, 85)
+        self.canvas.create_text(15, 27, anchor=tk.NW, text="Network Bus")
+
+    def animate_start(self, packet):
+        if packet.type in self.image_map:
+            img_id = self.canvas.create_image(self.x, self.y, anchor=tk.NW, image=self.image_map[packet.type])
+            txt_id = self.canvas.create_text(self.x, self.y + 30, anchor=tk.NW, text=packet.id)
+            self.active_items.extend([img_id, txt_id])
+
+    def animate_end(self):
+        # Clear specific items or all active (assuming single lane bus for now)
+        while self.active_items:
+            item = self.active_items.pop()
+            self.canvas.delete(item)
+
+
+class EdgeAnimator:
+    """Handles the animation of the Edge Processor working."""
+
+    def __init__(self, canvas, image_map):
+        self.canvas = canvas
+        self.image_map = image_map
+        self.active_items = []
+        self.x = 405
+        self.y = 95  # start_row
+
+    def animate_start(self, packet):
+        if packet.type in self.image_map:
+            img_id = self.canvas.create_image(self.x, self.y + 45, anchor=tk.NW, image=self.image_map[packet.type])
+            txt_id = self.canvas.create_text(self.x, self.y + 75, anchor=tk.NW, text=packet.id)
+            self.active_items.extend([img_id, txt_id])
+
+    def animate_end(self):
+        while self.active_items:
+            item = self.active_items.pop()
+            self.canvas.delete(item)
+
+
+class Dashboard:
+    """Manages the Matplotlib graphs and the Clock text."""
+
+    def __init__(self, ctx, canvas, graph_frame):
+        self.ctx = ctx
+        self.canvas = canvas
+
+        # Clock Text
+        self.clock_text_id = None
+        self.x_clock = 1100
+        self.y_clock = 260
+        self.canvas.create_rectangle(self.x_clock, self.y_clock, 1290, 340, fill="#fff")
+
+        # Matplotlib Setup
+        self.fig = plt.Figure(figsize=(2, 2), dpi=72)
+        self.ax_age = self.fig.add_subplot(222)
+        self.ax_success = self.fig.add_subplot(224)
+        self.ax_cost = self.fig.add_subplot(121)
+
+        self.plot_canvas = FigureCanvasTkAgg(self.fig, master=graph_frame)
+        self.plot_canvas.get_tk_widget().config(height=400)
+        self.plot_canvas.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
 
     def tick(self):
-        self.iiot_bus.paint_queue()
-        self.bus_iiot.paint_queue()
-        self.bus_edge.paint_queue()
-        self.edge_bus.paint_queue()
-        self.bus_scada.paint_queue()
-        self.scada_bus.paint_queue()
-        self.edge_sublist_visual.paint_queue()
-
-
-class ClockAndDataDraw:
-
-    def __init__(self, ctx, x1, y1, x2, y2, time):
-        # Draw the inital state of the clock and data on the canvas
-        self.x1 = x1
-        self.y1 = y1
-        self.x2 = x2
-        self.y2 = y2
-        self.canvas = canvas
-        self.train = canvas.create_rectangle(self.x1, self.y1, self.x2, self.y2, fill="#fff")
-        self.time = canvas.create_text(self.x1 + 10, self.y1 + 10, text="Time = " + str(round(time, 1)) + "m",
-                                       anchor=tk.NW)
-        # Code to show the seller wait time at queue.
-        #self.seller_wait = canvas.create_text(self.x1 + 10, self.y1 + 40,
-        #                                      text="Avg. Seller Wait  = " + str(avg_wait(seller_waits)), anchor=tk.NW)
-        # Code to show the scanner wait time at queue.
-        #self.scan_wait = canvas.create_text(self.x1 + 10, self.y1 + 70,
-        #                                    text="Avg. Scanner Wait = " + str(avg_wait(scan_waits)), anchor=tk.NW)
-        self.canvas.update()
-        self.data_plot = FigureCanvasTkAgg(f, master=main)
-        self.data_plot.get_tk_widget().config(height=400)
-        self.data_plot.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
-        self.iiot_list_visual = []
-        self.iiot_list = ctx.iiot_list
-        self.data_age = ctx.data_age
-        self.data_age_by_type = ctx.data_age_by_type
-        self.successful_operations_total = ctx.successful_operations_total
-        self.number_of_iiots = ctx.number_of_iiots
-        self.agent_flow_rates_by_type = ctx.agent_flow_rates_by_type
-        self.total_resource = ctx.total_resource
-        self.self_organization_measure = ctx.self_organization_measure
-
-    def paint_iiots(self):
-        for i in self.iiot_list_visual:
-            to_del = self.iiot_list_visual.pop()
-            canvas.delete(to_del)
-            canvas.update()
-
-        n = 1
-
-        for x in self.iiot_list:
-            element_name = x.name
-            x_top = 5
-            y_top = start_row + (regular_height + 10) * (n - 1)
-            n = n + 1
-            length = 60
-            height = regular_height
-
-            self.iiot_list_visual.append(canvas.create_rectangle(x_top, y_top, x_top + length, y_top + height))
-            self.iiot_list_visual.append(canvas.create_text(x_top + 10, y_top + 7, anchor=tk.NW,
-                                                              text=f"{element_name}"))
-            canvas.update()
-
-    def tick(self, time):
-        # re-draw the clock and data fields on the canvas. Also update the matplotlib charts
-        canvas.delete(self.time)
-
-        # Delete previous data.
-        #self.canvas.delete(self.seller_wait)
-        #self.canvas.delete(self.scan_wait)
-
-        self.time = canvas.create_text(self.x1 + 10, self.y1 + 10, text="Time = " + str(round(time, 1)) + "m",
-                                       anchor=tk.NW)
-
-        self.paint_iiots()
-
-        a1.cla()
-        a1.set_xlabel("Time")
-        a1.set_ylabel("Average Data Age")
-
-        a1.plot([t for (t, age) in self.data_age.items()], [np.mean(age) for (t, age) in self.data_age.items()],
-                label="all")
-
-        for key in image_map2.keys():
-            a1.plot([t for (t, age) in self.data_age_by_type[key].items()],
-                    [np.mean(age) for (t, age) in self.data_age_by_type[key].items()], label = key)
-        a1.legend(loc="upper left")
-
-        dt = 5
-
-        a2.cla()
-        a2.set_xlabel("Time")
-        a2.set_ylabel("Accumulated Success")
-        # code to calculate step function.
-        # successful_operations_total[float(env.now)].append(len([x for x in successful_operations if x > env.now - dt]))
-        a2.plot([t for (t, success) in self.successful_operations_total.items()],
-                [success for (t, success) in self.successful_operations_total.items()],
-                label="Average success over last " + str(dt) + " timesteps")
-
-        a3.cla()
-        a3.set_xlabel("Time")
-        a3.set_ylabel("System Cost")
-
-        a3.plot([t for (t, a) in self.number_of_iiots.items()],
-                [a for (t, a) in self.number_of_iiots.items()],
-                label="Iiots")
-
-        for key in self.agent_flow_rates_by_type.keys():
-            a3.plot([t for (t, a) in self.agent_flow_rates_by_type[key].items()],
-                    [a for (t, a) in self.agent_flow_rates_by_type[key].items()],
-                    label=key)
-        a3.plot([t for (t, a) in self.total_resource.items()],
-                [a for (t, a) in self.total_resource.items()],
-                label="Total")
-
-        a3.legend(loc="upper left")
-
-        # to calculate self-org, check how much the system has been
-        # "in motion" for the last X timesteps.
-        # sum of number of times the resources were re-allocated.
-
-        # self_organization_measure[float(env.now)].append(calc_self_org(dt))
-        a2.plot([t for (t, a) in self.self_organization_measure.items()],
-                [a for (t, a) in self.self_organization_measure.items()],
-                label="Self-organization effort over last " + str(dt) + " timesteps")
-
-        a2.legend(loc="upper left")
-
-        self.data_plot.draw()
-        self.canvas.update()
-
-
-class EdgeStationDraw:
-    def __init__(self):
-        self.station_item_presentation = []
-        self.x = 405
-        self.y = start_row
-
-    def run_draw(self, moved):
-        self.station_item_presentation.append(
-            canvas.create_image(self.x, self.y + 45, anchor=tk.NW, image=image_map2[moved.type])
+        # 1. Update Clock
+        time = self.ctx.env.now
+        if self.clock_text_id:
+            self.canvas.delete(self.clock_text_id)
+        self.clock_text_id = self.canvas.create_text(
+            self.x_clock + 10, self.y_clock + 10,
+            text="Time = " + str(round(time, 1)) + "m",
+            anchor=tk.NW
         )
-        self.station_item_presentation.append(canvas.create_text(self.x, self.y + 75, anchor=tk.NW, text=moved.id))
 
-        canvas.update()
+        # 2. Update Graphs (Simplified for performance, full redraw is heavy)
+        # Only redraw every 5 ticks or so if performance lags, but for now we do every tick
 
-    def run_delete(self):
-        for i in self.station_item_presentation:
-            to_del = self.station_item_presentation.pop()
-            canvas.delete(to_del)
-            canvas.update()
+        # Data Age Plot
+        self.ax_age.cla()
+        self.ax_age.set_xlabel("Time")
+        self.ax_age.set_ylabel("Avg Data Age")
 
+        if self.ctx.data_age:
+            times = list(self.ctx.data_age.keys())
+            avgs = [np.mean(v) for v in self.ctx.data_age.values()]
+            self.ax_age.plot(times, avgs, label="All")
+        self.ax_age.legend(loc="upper left")
 
-def save_graph(ctx, now):
-    yield ctx.env.timeout(ctx.config.end_time-0.1)
+        # Success Plot
+        self.ax_success.cla()
+        self.ax_success.set_xlabel("Time")
+        self.ax_success.set_ylabel("Accum. Success")
+        if self.ctx.successful_operations_total:
+            t = list(self.ctx.successful_operations_total.keys())
+            v = list(self.ctx.successful_operations_total.values())
+            self.ax_success.plot(t, v, label="Success")
+        self.ax_success.legend(loc="upper left")
 
-    save_name = "self_org_plot end_time_" + str(ctx.config.end_time)
+        # Cost/Resource Plot
+        self.ax_cost.cla()
+        self.ax_cost.set_xlabel("Time")
+        self.ax_cost.set_ylabel("System Cost")
+        if self.ctx.number_of_iiots:
+            t = list(self.ctx.number_of_iiots.keys())
+            v = list(self.ctx.number_of_iiots.values())
+            self.ax_cost.plot(t, v, label="IIoT Nodes")
 
-    DATA_DIR = create_folder(save_name, now)
+        self.ax_cost.legend(loc="upper left")
 
-    CSV_PATH = DATA_DIR + "//data"
-
-    with open(CSV_PATH, 'w', encoding='UTF8') as file:
-        writer = csv.writer(file)
-
-        for ax in f.get_axes():
-            writer.writerow([ax.get_xlabel, ax.get_ylabel])
-            for line in a2.lines:
-                d = line.get_label
-                writer.writerow([line.get_label])
-                x = line.get_xdata()
-                y = line.get_ydata()
-                for n in range(len(x)):
-                    writer.writerow([x[n], y[n]])
-
-    svg_file_name = DATA_DIR + "\\" + save_name + ".svg"
-    f.savefig(svg_file_name)
-
-
-
-def create_folder(name, now):
-
-    # name = "sim_data\\"+now+"\\"+name
-
-    ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-
-    top_folder = os.path.join(ROOT_DIR, "sim_data")
-    create_folder_path(top_folder)
-
-    date_folder = os.path.join(top_folder, now)
-    create_folder_path(date_folder)
-
-    DATA_DIR = os.path.join(date_folder, name)
-    create_folder_path(DATA_DIR)
-    # #check if dir exists - if not: create
-    # if not os.path.exists(DATA_DIR):
-    #     os.mkdir(DATA_DIR)
-
-    return DATA_DIR
-
-
-def create_folder_path(path):
-
-    if not os.path.exists(path):
-        os.mkdir(path)
-
-
-
+        self.plot_canvas.draw()
