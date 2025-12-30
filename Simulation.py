@@ -4,14 +4,10 @@ import pandas as pd
 from datetime import datetime
 
 
-from agents.iiot_node import IIoT_Node
-from agents.network_bus import Network_Bus, check_queue
-from agents.edge_processor import Edge_Processor
-from agents.scada_actuator import SCADA_Actuator
-
+from agents import IIoTNode, NetworkBus, check_queue, EdgeProcessor, SCADAActuator
 from BackendClasses import clockanddatacalc_func
-
 from sim_context import SimulationContext
+import UIClasses
 
 # -------------------------
 # SIMULATION
@@ -22,9 +18,6 @@ from sim_context import SimulationContext
 # all plotted data - need to check how it's done maybe?
 
 def main_run(config):
-
-    if config.ui:
-        import UIClasses
 
     now = datetime.now().ctime()
     now = now.replace(":", "_")
@@ -50,59 +43,57 @@ def main_run(config):
         # iiot accuracy = iiot_acc.
         iiot_chance = config.iiot_acc*random.random()
         # add new iiot
-        ctx.iiot_list.append(IIoT_Node(ctx, iiot_chance, iiot_number))
+        ctx.iiot_list.append(IIoTNode(ctx, iiot_chance, iiot_number))
         # increase iiot count
         return iiot_number + 1
 
-    def kill_iiot(ctx, iiot):
-        iiot.is_alive = False
-        ctx.iiot_list.remove(iiot)
+    def kill_iiot(ctx, iiot_name):
+        if not ctx.iiot_list:
+            return
+
+        target_node = None
+        if iiot_name:
+            # Find specific node to kill
+            for node in ctx.iiot_list:
+                if node.name == iiot_name:
+                    target_node = node
+                    break
+        else:
+            # Random kill
+            target_node = random.choice(ctx.iiot_registry)
+
+        if target_node:
+            target_node.is_alive = False
+            if target_node in ctx.iiot_list:
+                ctx.iiot_list.remove(target_node)
+
+
 
     # we need to select how much we change the number of iiots, and then execute it.
 
 
     def iiot_maker(ctx, bus, edge, scada):
+        """
+        Monitors feedback queue and adds/removes IIoT Nodes based on performance.
+        """
+
         iiot_number = 2
 
         while True:
-            #   LOGIC FOR IMPLEMENTATION - suggestion
-            # ---------------------------------------------
-            # do not kill a iiot if it is the last one.
-            # if we are at max resource, kill iiot.
-            # if new feedback is gained:
-            #   if good - create new iiot
-            #   if bad - kill iiot
-            # if none of the above - check self_org.
-            #   if lower then threshold - calculate what would increase the self-org and act accordingly.
-            #   currently, any change in number of iiots increases self-org.
-            #   randomly decide if increasing or decreasing (considering you won't get over max resource or kill
-            #   the last iiot
+            # Wait for Feedback
+            feedback = yield ctx.bus_iiot_queue.get()
 
-            # CURRENT LOGIC
-            # -------------------------------------------
-            # while there are any feedback data packet:
-            while len(ctx.bus_iiot_queue) > 0:
+            # Logic: Positive Feedback -> Grow
+            if feedback.status:
+                if check_max_resource(ctx, bus, edge, scada):
+                    iiot_number = create_new_iiot(iiot_number, ctx)
 
-                # if scada feedback is good, create new iiot and kill the data packet.
-                # if actuation is right:
-                if ctx.bus_iiot_queue[0].status:
-
-                    # if there are enough resources - grow the number of iiots. else - do nothing.
-                    if check_max_resource(ctx, bus, edge, scada):
-                        iiot_number = create_new_iiot(iiot_number, ctx)
-                    # kill the data, even if you did not create an iiot.
-                    ctx.bus_iiot_queue.pop(0)
-                # else, if scada actuation is wrong and failed.
-                else:
-                    b = ctx.bus_iiot_queue[0]
-                    for iiot in ctx.iiot_list.copy():
-                        # find the rouge iiot and kill it.
-                        if iiot.name == b.creator:
-                            kill_iiot(ctx, iiot)
-                    # if the iiot list is empty, create a new iiot.
-                    if len(ctx.iiot_list) == 0:
-                        iiot_number = create_new_iiot(iiot_number, ctx.env)
-                    ctx.bus_iiot_queue.pop(0)
+            # Logic: Negative Feedback -> Prune Rogue Node
+            else:
+                kill_iiot(ctx, feedback.creator)
+                # If we killed the last one, restart population
+                if len(ctx.iiot_list) == 0:
+                    node_counter = create_new_iiot(iiot_number, ctx)
 
             # if we are at max resource, reduce the number of iiots
             if not check_max_resource(ctx, bus, edge, scada) and len(ctx.iiot_list) > 1:
@@ -130,7 +121,7 @@ def main_run(config):
                                     removed_iiot = random.choice(ctx.iiot_list.copy())
                                     kill_iiot(ctx, removed_iiot)
 
-            yield ctx.env.timeout(0.1)
+            yield ctx.env.timeout(0.01)
 
     # same as previous logic, only with general object
     # object could be bus network, edge processor station or scada upgrade
@@ -148,33 +139,48 @@ def main_run(config):
 
     def bus_upgrade(ctx, bus, edge, scada):
         while True:
-            if check_queue(ctx) < (bus.flow_rate - 1) * 5 and bus.flow_rate > 1:
-                bus.flow_rate = bus.flow_rate - 1
-            if check_max_resource(ctx, bus, edge, scada):
-                while check_queue(ctx) > bus.flow_rate * 5:
-                    bus.flow_rate = bus.flow_rate + 1
-            increase_self_org(ctx, bus, "Network Bus")
             yield ctx.env.timeout(0.1)
+            # Check length of PriorityStore items
+            q_len = len(ctx.bus_input_queue.items)
+
+            if q_len > bus.flow_rate * 5:
+                if check_max_resource(ctx, bus, edge, scada):
+                    bus.flow_rate += 1
+                elif q_len == 0 and bus.flow_rate > 1:
+                    bus.flow_rate -= 1
+
+            increase_self_org(ctx, bus, "Network Bus")
+
 
     def edge_upgrade(ctx, edge, bus, scada):
         while True:
-            if len(ctx.bus_edge_queue) < (edge.flow_rate - 1) * 5 and edge.flow_rate > 1:
-                edge.flow_rate = edge.flow_rate - 1
-            if check_max_resource(ctx, bus, edge, scada):
-                while len(ctx.bus_edge_queue) > edge.flow_rate * 5:
-                    edge.flow_rate = edge.flow_rate + 1
+            yield ctx.env.timeout(0.1)
+            q_len = len(ctx.bus_edge_queue.items)
+
+            if q_len > edge.flow_rate * 5:
+                if check_max_resource(ctx, bus, edge, scada):
+                    edge.flow_rate += 1
+            elif q_len == 0 and edge.flow_rate > 1:
+                edge.flow_rate -= 1
+
             increase_self_org(ctx, edge, "Edge Processor")
             yield ctx.env.timeout(0.1)
 
     def scada_upgrade(ctx, scada, bus, edge):
         while True:
-            if len(ctx.bus_scada_queue) < (scada.flow_rate - 1) * 5 and scada.flow_rate > 1:
-                scada.flow_rate = scada.flow_rate - 1
-            if check_max_resource(ctx, bus, edge, scada):
-                while len(ctx.bus_scada_queue) > scada.flow_rate * 5:
-                    scada.flow_rate = scada.flow_rate + 1
+            yield ctx.env.timeout(0.1)
+
+            q_len = len(ctx.bus_scada_queue.items)
+
+            if q_len > scada.flow_rate * 5:
+                if check_max_resource(ctx, bus, edge, scada):
+                    scada.flow_rate += 1
+            elif q_len == 0 and scada.flow_rate > 1:
+                scada.flow_rate -= 1
+
+
             increase_self_org(ctx, scada, "SCADA Actuator")
-            yield ctx.env.timeout(1.1)
+
 
     # original function
     clock = {}
@@ -202,12 +208,13 @@ def main_run(config):
 
 
 
-    bus = Network_Bus(ctx)
-    scada = SCADA_Actuator(ctx)
-    edge = Edge_Processor(ctx)
+    bus = NetworkBus(ctx)
+    scada = SCADAActuator(ctx)
+    edge = EdgeProcessor(ctx)
+
     env.process(create_clock(ctx, bus, edge, scada, clock, UI_obj))
 
-    ctx.iiot_list.append(IIoT_Node(ctx,0.5, 1))
+    ctx.iiot_list.append(IIoTNode(ctx,0.5, 1))
     env.process(iiot_maker(ctx, bus, edge, scada))
     env.process(bus_upgrade(ctx, bus, edge, scada))
     env.process(edge_upgrade(ctx, edge, bus, scada))

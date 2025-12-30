@@ -110,10 +110,9 @@ def calc_self_org_over_time(ctx):
 # calculate data type age over time (for a1).
 def calc_ages(ctx):
     # calculate average time for all objects.
+    all_packets = ctx.get_all_packets()
 
-    ages = [ctx.env.now - data_object.time for data_object in (ctx.iiot_bus_queue + ctx.bus_edge_queue +
-                                                           ctx.edge_bus_queue + ctx.bus_scada_queue +
-                                                           ctx.scada_bus_queue + ctx.bus_iiot_queue)]
+    ages = [ctx.env.now - data_object.time for data_object in all_packets]
 
     # data_age[float(env.now)].append(ages)
     add_to_dict_arr(ctx.data_age, float(ctx.env.now), ages)
@@ -123,9 +122,8 @@ def calc_ages(ctx):
     # time now minus creation time.
     # for the list of object with that data type in all 6 busess
     for key in ctx.config.data_type_keys:
-        add_to_dict_arr(ctx.data_age_by_type[key], float(ctx.env.now), [ctx.env.now - data_object.time for data_object in [
-                i for i in (ctx.iiot_bus_queue + ctx.bus_edge_queue + ctx.edge_bus_queue +
-                            ctx.bus_scada_queue + ctx.scada_bus_queue + ctx.bus_iiot_queue) if i.type == key]])
+        type_ages = [ctx.env.now - data_object.time for data_object in all_packets if data_object.type == key]
+        add_to_dict_arr(ctx.data_age_by_type[key], float(ctx.env.now), type_ages)
 
 
 # calculate measure of success over time (for a2)

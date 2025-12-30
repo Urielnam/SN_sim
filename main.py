@@ -22,7 +22,7 @@ RUN_PARAMS = {
     "end_time": 1000,
     "max_resource": 100,
     "dt": 5,
-    "iiot_acc": 0.1,
+    "iiot_acc": 0.6,
     "self_org_active": False,
     "self_org_threshold": 35,
     "ui": False,

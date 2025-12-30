@@ -1,7 +1,7 @@
 from agents.data_packet import DataPacket
 
 # scada actuator acts when there is correct datapack in the pipeline
-class SCADA_Actuator(object):
+class SCADAActuator(object):
     def __init__(self, ctx):
         self.ctx = ctx
         self.env = ctx.env
@@ -11,23 +11,30 @@ class SCADA_Actuator(object):
     def run(self):
         while True:
 
-            if len(self.ctx.bus_scada_queue) > 0:
-                a = self.ctx.bus_scada_queue[0]
-                self.ctx.bus_scada_queue.pop(0)
-                self.ctx.scada_data_usage_time.append(self.env.now - a.time)
-                yield self.env.timeout(1 / self.flow_rate)
-                # print(bus_scada_queue[0].status)
-                if a.status:
-                    # print("Attack successful!")
-                    # send back positive feedback
-                    self.ctx.scada_bus_queue.append(DataPacket(True, self.env.now,
-                                                   'feedback', a.creator))
-                    self.ctx.successful_operations.append(self.env.now)
-                if not a.status:
-                    # print("Attack failed")
-                    # send back negative feedback
-                    self.ctx.scada_bus_queue.append(DataPacket(False, self.env.now,
-                                                   'feedback', a.creator))
+            # 1. WAIT
+            # Sleep until the Bus delivers a 'Target' packet
+            target_packet = yield self.ctx.bus_scada_queue.get()
 
-            else:
-                yield self.env.timeout(1)
+            # Record metrics (Latency calculation)
+            self.ctx.scada_data_usage_time.append(self.env.now - target_packet.time)
+
+            # 2. Actuate
+            yield self.env.timeout(1 / self.flow_rate)
+
+            # 3. FEEDBACK GENERATION
+            # Determine if the operation was a success based on the packet's truth value
+            is_success = target_packet.status
+
+            if is_success:
+                # Log success for statistics
+                self.ctx.successful_operations.append(self.env.now)
+
+            # Create the feedback packet
+            feedback_packet = DataPacket(
+                status = is_success,
+                time = self.env.now,
+                type='feedback',
+                creator=target_packet.creator
+            )
+
+            yield self.ctx.send_to_bus(feedback_packet)
