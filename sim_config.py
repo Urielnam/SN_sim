@@ -11,7 +11,7 @@ class SimulationConfig:
     max_resource: int = 100
 
     # Physics/Logic
-    sensor_acc: float = 0.1
+    iiot_acc: float = 0.1
     self_org_active: bool = False
     self_org_threshold: float = 35
 
@@ -19,20 +19,20 @@ class SimulationConfig:
 
     # Topology (Moved from Simulation.py global scope)
     connecting_graph: Dict = field(default_factory=lambda: {
-        "action to array": {
-            "intel": "array to analysis",
-            "feedback": "array to analysis",
-            "target": "array to analysis"
+        "scada to bus": {
+            "intel": "bus to edge",
+            "feedback": "bus to edge",
+            "target": "bus to edge"
         },
-        "analysis to array": {
-            "intel": "array to action",
-            "feedback": "array to sensor",
-            "target": "array to action"
+        "edge to bus": {
+            "intel": "bus to scada",
+            "feedback": "bus to iiot",
+            "target": "bus to scada"
         },
-        "sensor to array": {
-            "intel": "array to analysis",
-            "feedback": "array to analysis",
-            "target": "array to analysis"
+        "iiot to bus": {
+            "intel": "bus to edge",
+            "feedback": "bus to edge",
+            "target": "bus to edge"
         }
     })
 

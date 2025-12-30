@@ -3,6 +3,12 @@ import random
 import pandas as pd
 from datetime import datetime
 
+
+from agents.iiot_node import IIoT_Node
+from agents.network_bus import Network_Bus, check_queue
+from agents.edge_processor import Edge_Processor
+from agents.scada_actuator import SCADA_Actuator
+
 from BackendClasses import clockanddatacalc_func
 
 from sim_context import SimulationContext
@@ -10,23 +16,6 @@ from sim_context import SimulationContext
 # -------------------------
 # SIMULATION
 # -------------------------
-data_type_keys = ["intel", "feedback", "target"]
-
-# Intel object. Has a real/wrong status and time created
-# data types: "intel", "feedback"
-
-
-class Data:
-    def __init__(self, status, time, type, creator):
-        # status parameter is real/false - it's the notion of if the data is right or wrong.
-        self.status = status
-        self.time = time
-        # data types - intel, feedback
-        self.type = type
-        self.creator = creator
-        # adds an image so that we can paint it later
-        self.id = self.type + " from " + self.creator + "\n at time " + str(self.time)
-
 
 # export data at the end of runtime.
 # data to include
@@ -40,233 +29,85 @@ def main_run(config):
     now = datetime.now().ctime()
     now = now.replace(":", "_")
 
-    def create_clock(ctx, array, analysis_station, action_station, clock, UI_obj):
+    def create_clock(ctx, bus, edge, scada, clock, UI_obj):
         # This generator is meant to be used as a SimPy event to update the clock and the data in the UI
 
         while True:
             yield ctx.env.timeout(0.1)
-            clockanddatacalc_func(ctx, array, analysis_station, action_station)
+            clockanddatacalc_func(ctx, bus, edge, scada)
 
             if config.ui:
                 clock.tick(ctx.env.now)
                 UI_obj.tick()
 
+    def check_max_resource(ctx, bus, edge, scada):
+        return (len(ctx.iiot_list) + bus.flow_rate +
+                edge.flow_rate +
+                scada.flow_rate) < ctx.config.max_resource
 
-    # Every time step the sensors create new information bit.
-    # Info has real/wrong status
-    # Intel generated is randomly selected to be true or false with a certain precentage.
-    class Sensor(object):
-        def __init__(self, ctx, correctness_probability, order):
-            self.ctx = ctx
-            self.env = ctx.env
-            self.action = self.env.process(self.run())
-            self.correctness_probability = correctness_probability
-            self.order = order
-            self.name = "Sensor " + str(order)
-            self.is_alive = True
-
-        def run(self):
-            while self.is_alive:
-                # print('Create new info bit at time %d' % env.now)
-                yield self.env.timeout(1)
-                self.ctx.sensor_array_queue.append(Data(random.random() < self.correctness_probability,
-                                               self.env.now, 'intel', self.name))
-
-    # The array moves data between different queues. It can move only one object per lane.
-    class Array(object):
-        def __init__(self, ctx):
-            self.ctx = ctx
-            self.env = ctx.env
-            self.action = self.env.process(self.run())
-            self.ui_flag = ctx.config.ui
-
-            self.flow_rate = 1
-
-            if self.ui_flag:
-                self.arr = UIClasses.ArrayDraw()
-
-        def move_item(self, queue_from, queue_to):
-            moved_item = queue_from[0]
-            queue_from.pop(0)
-            # # draw inside box
-            if self.ui_flag:
-                self.arr.arr_move_item(moved_item)
-
-            yield self.env.timeout(1 / self.flow_rate)
-
-            if self.ui_flag:
-                self.arr.arr_clear_item()
-
-            queue_to.append(moved_item)
-
-        def run(self):
-
-            while True:
-
-                # for each lane, move one data unit per time
-                for i in range(self.flow_rate):
-                    if check_queue(self.ctx) == 0:
-                        yield self.env.timeout(1)
-                        break
-                    selected_array = random.choice([x for x in ctx.start_nodes.keys() if len(ctx.start_nodes[x]) > 0])
-                    second_array = ctx.config.connecting_graph[selected_array][ctx.start_nodes[selected_array][0].type]
-                    yield self.env.process(self.move_item(ctx.start_nodes[selected_array], ctx.end_nodes[second_array]))
-
-    def check_queue(ctx):
-        return len(ctx.sensor_array_queue) + len(ctx.analysis_array_queue) + len(ctx.action_array_queue)
-
-    # need to create analysis station, then action station and then start messing with accuracy.
-    # if one of the intel is true, the intel is correct and the boogie is found. if both are false, the attack failes.
-    # I need to change it so it ingests one intel article per cycle.
-    class AnalysisStation(object):
-        def __init__(self, ctx):
-            self.ctx = ctx
-            self.env = ctx.env
-            self.action = ctx.env.process(self.run())
-            self.ui_flag = ctx.config.ui
-            self.flow_rate = 1
-            if self.ui_flag:
-                self.draw = UIClasses.AnalysisStationDraw()
-
-        def run(self):
-
-            while True:
-                # first, check for feedback in first cell, if there isn't any feedback, proceed to analyze the data.
-
-                bank_size = 2
-
-                if len(self.ctx.array_analysis_queue) == 0:
-                    yield self.env.timeout(1)
-
-                else:
-                    moved_item = self.ctx.array_analysis_queue[0]
-                    self.ctx.array_analysis_queue.pop(0)
-                    self.ctx.analysis_data_usage_time.append(self.env.now - moved_item.time)
-
-                    if self.ui_flag:
-                        self.draw.run_draw(moved_item)
-
-                    yield self.env.timeout(1 / self.flow_rate)
-
-                    if self.ui_flag:
-                        self.draw.run_delete()
-
-                    if moved_item.type == 'feedback':
-                        self.ctx.analysis_array_queue.append(moved_item)
-
-                    # if data type is info, save it for digestion
-                    else:
-                        # add data to data bank.
-                        self.ctx.analysis_sublist.append(moved_item)
-
-                        # if bank size is equal to bank_size, delete bank and create new data
-                        if len(self.ctx.analysis_sublist) == bank_size:
-                            self.ctx.analysis_array_queue.append(Data(ctx.analysis_sublist[0].status or self.ctx.analysis_sublist[1].status,
-                                                             self.env.now, 'target',
-                                                             random.choice(self.ctx.analysis_sublist).creator))
-                            self.ctx.analysis_sublist.pop(0)
-                            self.ctx.analysis_sublist.pop(0)
-
-    # action_station acts when there is intel in the pipeline
-    class ActionStation(object):
-        def __init__(self, ctx):
-            self.ctx = ctx
-            self.env = ctx.env
-            self.action = self.env.process(self.run())
-            self.flow_rate = 1
-
-        def run(self):
-            while True:
-
-                if len(self.ctx.array_action_queue) > 0:
-                    a = self.ctx.array_action_queue[0]
-                    self.ctx.array_action_queue.pop(0)
-                    self.ctx.action_data_usage_time.append(self.env.now - a.time)
-                    yield self.env.timeout(1 / self.flow_rate)
-                    # print(array_action_queue[0].status)
-                    if a.status:
-                        # print("Attack successful!")
-                        # send back positive feedback
-                        self.ctx.action_array_queue.append(Data(True, self.env.now,
-                                                       'feedback', a.creator))
-                        self.ctx.successful_operations.append(self.env.now)
-                    if not a.status:
-                        # print("Attack failed")
-                        # send back negative feedback
-                        self.ctx.action_array_queue.append(Data(False, self.env.now,
-                                                       'feedback', a.creator))
-
-                else:
-                    yield self.env.timeout(1)
-
-    def check_max_resource(ctx, array, analysis_station, action_station):
-        return (len(ctx.sensor_list) + array.flow_rate +
-                analysis_station.flow_rate +
-                action_station.flow_rate) < ctx.config.max_resource
-
-    def create_new_sensor(sensor_number, ctx):
+    def create_new_iiot(iiot_number, ctx):
         # set a random number for the chances of giving good info.
-        # sensor accuracy = sensor_acc.
-        sensor_chance = config.sensor_acc*random.random()
-        # add new sensor
-        ctx.sensor_list.append(Sensor(ctx, sensor_chance, sensor_number))
-        # increase sensor count
-        return sensor_number + 1
+        # iiot accuracy = iiot_acc.
+        iiot_chance = config.iiot_acc*random.random()
+        # add new iiot
+        ctx.iiot_list.append(IIoT_Node(ctx, iiot_chance, iiot_number))
+        # increase iiot count
+        return iiot_number + 1
 
-    def kill_sensor(ctx, sensor):
-        sensor.is_alive = False
-        ctx.sensor_list.remove(sensor)
+    def kill_iiot(ctx, iiot):
+        iiot.is_alive = False
+        ctx.iiot_list.remove(iiot)
 
-    # we need to select how much we change the number of sensors, and then execute it.
+    # we need to select how much we change the number of iiots, and then execute it.
 
 
-    def sensor_maker(ctx, array, analysis_station, action_station):
-        sensor_number = 2
+    def iiot_maker(ctx, bus, edge, scada):
+        iiot_number = 2
 
         while True:
             #   LOGIC FOR IMPLEMENTATION - suggestion
             # ---------------------------------------------
-            # do not kill a sensor if it is the last one.
-            # if we are at max resource, kill sensor.
+            # do not kill a iiot if it is the last one.
+            # if we are at max resource, kill iiot.
             # if new feedback is gained:
-            #   if good - create new sensor
-            #   if bad - kill sensor
+            #   if good - create new iiot
+            #   if bad - kill iiot
             # if none of the above - check self_org.
             #   if lower then threshold - calculate what would increase the self-org and act accordingly.
-            #   currently, any change in number of sensors increases self-org.
+            #   currently, any change in number of iiots increases self-org.
             #   randomly decide if increasing or decreasing (considering you won't get over max resource or kill
-            #   the last sensor
+            #   the last iiot
 
             # CURRENT LOGIC
             # -------------------------------------------
-            # while there are any feedback data:
-            while len(ctx.array_sensor_queue) > 0:
+            # while there are any feedback data packet:
+            while len(ctx.bus_iiot_queue) > 0:
 
-                # if action feedback is good, create new sensor and kill the data.
-                # if action is right:
-                if ctx.array_sensor_queue[0].status:
+                # if scada feedback is good, create new iiot and kill the data packet.
+                # if actuation is right:
+                if ctx.bus_iiot_queue[0].status:
 
-                    # if there are enough resources - grow the number of sensors. else - do nothing.
-                    if check_max_resource(ctx, array, analysis_station, action_station):
-                        sensor_number = create_new_sensor(sensor_number, ctx)
-                    # kill the data, even if you did not create a sensor.
-                    ctx.array_sensor_queue.pop(0)
-                # else, if actions is wrong and failed.
+                    # if there are enough resources - grow the number of iiots. else - do nothing.
+                    if check_max_resource(ctx, bus, edge, scada):
+                        iiot_number = create_new_iiot(iiot_number, ctx)
+                    # kill the data, even if you did not create an iiot.
+                    ctx.bus_iiot_queue.pop(0)
+                # else, if scada actuation is wrong and failed.
                 else:
-                    b = ctx.array_sensor_queue[0]
-                    for sensor in ctx.sensor_list.copy():
-                        # find the rouge sensor and kill it.
-                        if sensor.name == b.creator:
-                            kill_sensor(ctx, sensor)
-                    # if the sensor list is empty, create a new sensor.
-                    if len(ctx.sensor_list) == 0:
-                        sensor_number = create_new_sensor(sensor_number, ctx.env)
-                    ctx.array_sensor_queue.pop(0)
+                    b = ctx.bus_iiot_queue[0]
+                    for iiot in ctx.iiot_list.copy():
+                        # find the rouge iiot and kill it.
+                        if iiot.name == b.creator:
+                            kill_iiot(ctx, iiot)
+                    # if the iiot list is empty, create a new iiot.
+                    if len(ctx.iiot_list) == 0:
+                        iiot_number = create_new_iiot(iiot_number, ctx.env)
+                    ctx.bus_iiot_queue.pop(0)
 
-            # if we are at max resource, reduce the number of sensors
-            if not check_max_resource(ctx, array, analysis_station, action_station) and len(ctx.sensor_list) > 1:
-                selected_sensor = random.choice(ctx.sensor_list)
-                kill_sensor(ctx, selected_sensor)
+            # if we are at max resource, reduce the number of iiots
+            if not check_max_resource(ctx, bus, edge, scada) and len(ctx.iiot_list) > 1:
+                selected_iiot = random.choice(ctx.iiot_list)
+                kill_iiot(ctx, selected_iiot)
 
             if config.self_org_active:
                 """
@@ -281,58 +122,58 @@ def main_run(config):
                 """
                 if len(ctx.self_organization_measure) > 600:
                     if list(ctx.self_organization_measure.values())[-1][0] < ctx.config.self_org_threshold:
-                        if len(ctx.sensor_list) == list(ctx.number_of_sensors.values())[-1][0]:
-                            if check_max_resource(ctx, array, analysis_station, action_station):
-                                sensor_number = create_new_sensor(sensor_number, ctx.env)
+                        if len(ctx.iiot_list) == list(ctx.number_of_iiots.values())[-1][0]:
+                            if check_max_resource(ctx, bus, edge, scada):
+                                iiot_number = create_new_iiot(iiot_number, ctx.env)
                             else:
-                                if len(ctx.sensor_list) > 1:
-                                    removed_sensor = random.choice(ctx.sensor_list.copy())
-                                    kill_sensor(ctx, removed_sensor)
+                                if len(ctx.iiot_list) > 1:
+                                    removed_iiot = random.choice(ctx.iiot_list.copy())
+                                    kill_iiot(ctx, removed_iiot)
 
             yield ctx.env.timeout(0.1)
 
     # same as previous logic, only with general object
-    # object could be array, analysis station or action upgrade
+    # object could be bus network, edge processor station or scada upgrade
     def increase_self_org(ctx, object, object_name):
 
         if config.self_org_active:
             if len(ctx.self_organization_measure) > 600:
                 if list(ctx.self_organization_measure.values())[-1][0] < ctx.config.self_org_threshold:
                     if object.flow_rate == list(ctx.agent_flow_rates_by_type[object_name].values())[-1]:
-                        if check_max_resource(ctx, array, analysis_station, action_station):
+                        if check_max_resource(ctx, bus, edge, scada):
                             object.flow_rate = object.flow_rate + 1
                         else:
                             if object.flow_rate > 1:
                                 object.flow_rate = object.flow_rate - 1
 
-    def array_upgrade(ctx, array, analysis_station, action_station):
+    def bus_upgrade(ctx, bus, edge, scada):
         while True:
-            if check_queue(ctx) < (array.flow_rate - 1) * 5 and array.flow_rate > 1:
-                array.flow_rate = array.flow_rate - 1
-            if check_max_resource(ctx, array, analysis_station, action_station):
-                while check_queue(ctx) > array.flow_rate * 5:
-                    array.flow_rate = array.flow_rate + 1
-            increase_self_org(ctx, array, "Array")
+            if check_queue(ctx) < (bus.flow_rate - 1) * 5 and bus.flow_rate > 1:
+                bus.flow_rate = bus.flow_rate - 1
+            if check_max_resource(ctx, bus, edge, scada):
+                while check_queue(ctx) > bus.flow_rate * 5:
+                    bus.flow_rate = bus.flow_rate + 1
+            increase_self_org(ctx, bus, "Network Bus")
             yield ctx.env.timeout(0.1)
 
-    def analysis_upgrade(ctx, analysis_station, array, action_station):
+    def edge_upgrade(ctx, edge, bus, scada):
         while True:
-            if len(ctx.array_analysis_queue) < (analysis_station.flow_rate - 1) * 5 and analysis_station.flow_rate > 1:
-                analysis_station.flow_rate = analysis_station.flow_rate - 1
-            if check_max_resource(ctx, array, analysis_station, action_station):
-                while len(ctx.array_analysis_queue) > analysis_station.flow_rate * 5:
-                    analysis_station.flow_rate = analysis_station.flow_rate + 1
-            increase_self_org(ctx, analysis_station, "Analysis Station")
+            if len(ctx.bus_edge_queue) < (edge.flow_rate - 1) * 5 and edge.flow_rate > 1:
+                edge.flow_rate = edge.flow_rate - 1
+            if check_max_resource(ctx, bus, edge, scada):
+                while len(ctx.bus_edge_queue) > edge.flow_rate * 5:
+                    edge.flow_rate = edge.flow_rate + 1
+            increase_self_org(ctx, edge, "Edge Processor")
             yield ctx.env.timeout(0.1)
 
-    def action_upgrade(ctx, action_station, array, analysis_station):
+    def scada_upgrade(ctx, scada, bus, edge):
         while True:
-            if len(ctx.array_action_queue) < (action_station.flow_rate - 1) * 5 and action_station.flow_rate > 1:
-                action_station.flow_rate = action_station.flow_rate - 1
-            if check_max_resource(ctx, array, analysis_station, action_station):
-                while len(ctx.array_action_queue) > action_station.flow_rate * 5:
-                    action_station.flow_rate = action_station.flow_rate + 1
-            increase_self_org(ctx, action_station, "Action Station")
+            if len(ctx.bus_scada_queue) < (scada.flow_rate - 1) * 5 and scada.flow_rate > 1:
+                scada.flow_rate = scada.flow_rate - 1
+            if check_max_resource(ctx, bus, edge, scada):
+                while len(ctx.bus_scada_queue) > scada.flow_rate * 5:
+                    scada.flow_rate = scada.flow_rate + 1
+            increase_self_org(ctx, scada, "SCADA Actuator")
             yield ctx.env.timeout(1.1)
 
     # original function
@@ -344,13 +185,13 @@ def main_run(config):
         ctx = SimulationContext(env, config)
 
         UI_obj = UIClasses.PaintGrapic(
-            ctx.sensor_array_queue,
-            ctx.array_sensor_queue,
-            ctx.array_analysis_queue,
-            ctx.analysis_sublist,
-            ctx.analysis_array_queue,
-            ctx.array_action_queue,
-            ctx.action_array_queue)
+            ctx.iiot_bus_queue,
+            ctx.bus_iiot_queue,
+            ctx.bus_edge_queue,
+            ctx.edge_sublist,
+            ctx.edge_bus_queue,
+            ctx.bus_scada_queue,
+            ctx.scada_bus_queue)
 
         clock = UIClasses.ClockAndDataDraw(ctx,1100, 260, 1290, 340, 0)
 
@@ -361,16 +202,16 @@ def main_run(config):
 
 
 
-    array = Array(ctx)
-    action_station = ActionStation(ctx)
-    analysis_station = AnalysisStation(ctx)
-    env.process(create_clock(ctx, array, analysis_station, action_station, clock, UI_obj))
+    bus = Network_Bus(ctx)
+    scada = SCADA_Actuator(ctx)
+    edge = Edge_Processor(ctx)
+    env.process(create_clock(ctx, bus, edge, scada, clock, UI_obj))
 
-    ctx.sensor_list.append(Sensor(ctx,0.5, 1))
-    env.process(sensor_maker(ctx, array, analysis_station, action_station))
-    env.process(array_upgrade(ctx, array, analysis_station, action_station))
-    env.process(analysis_upgrade(ctx, analysis_station, array, action_station))
-    env.process(action_upgrade(ctx, action_station, array, analysis_station))
+    ctx.iiot_list.append(IIoT_Node(ctx,0.5, 1))
+    env.process(iiot_maker(ctx, bus, edge, scada))
+    env.process(bus_upgrade(ctx, bus, edge, scada))
+    env.process(edge_upgrade(ctx, edge, bus, scada))
+    env.process(scada_upgrade(ctx, scada, bus, edge))
 
     if config.ui:
         env.process(UIClasses.save_graph(ctx, now))
@@ -384,7 +225,7 @@ def main_run(config):
         "data_age": ctx.data_age,
         "data_age_by_type": ctx.data_age_by_type,
         "successful_operations_total": ctx.successful_operations_total,
-        "number_of_sensors": ctx.number_of_sensors,
+        "number_of_iiots": ctx.number_of_iiots,
         "agent_flow_rates_by_type": ctx.agent_flow_rates_by_type,
         "total_resource": ctx.total_resource,
         "self_organization_measure": ctx.self_organization_measure,

@@ -5,13 +5,12 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 import matplotlib.pyplot as plt
 import numpy as np
-from Simulation import data_type_keys
 import random
 import statistics
 
 
 # draw the graph for a single run.
-def paint_final(simulation_collector, dt, run_num):
+def paint_final(simulation_collector, dt, run_num, config):
 
     f = plt.figure(figsize=(2, 2))
     f.suptitle('This is simulation run #' + str(run_num))
@@ -34,7 +33,7 @@ def paint_final(simulation_collector, dt, run_num):
     a1.plot([t for (t, age) in simulation_collector['data_age'].items()],
             [np.mean(age) for (t, age) in simulation_collector['data_age'].items()], label="all")
 
-    for key in data_type_keys:
+    for key in config.data_type_keys:
         a1.plot([t for (t, age) in simulation_collector['data_age_by_type'][key].items()],
                 [np.mean(age) for (t, age) in simulation_collector['data_age_by_type'][key].items()], label=key)
     a1.legend(loc="upper left")
@@ -52,9 +51,9 @@ def paint_final(simulation_collector, dt, run_num):
     a3.set_xlabel("Time")
     a3.set_ylabel("System Cost")
 
-    a3.plot([t for (t, a) in simulation_collector['number_of_sensors'].items()],
-            [a for (t, a) in simulation_collector['number_of_sensors'].items()],
-            label="Sensors")
+    a3.plot([t for (t, a) in simulation_collector['number_of_iiots'].items()],
+            [a for (t, a) in simulation_collector['number_of_iiots'].items()],
+            label="iiots")
 
     for key in simulation_collector['agent_flow_rates_by_type'].keys():
         a3.plot([t for (t, a) in simulation_collector['agent_flow_rates_by_type'][key].items()],
@@ -80,14 +79,14 @@ def paint_final(simulation_collector, dt, run_num):
 # a function that draws graphs for multiple runs
 # it gains the data from the simulation collector and then constructs the frame
 # top frame has the success from two runs, rest of the graph has all simulations split in a 2x2, 2x3, 3x3, etc config
-def multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_of_iterations):
+def multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_of_iterations, config):
     max_number_of_iterations = 2
     if number_of_iterations < max_number_of_iterations:
         for i in range(number_of_iterations):
-            paint_final(simulation_collector["run #" + str(i)], 5, i)
+            paint_final(simulation_collector["run #" + str(i)], 5, i, config)
     else:
         for i in random.sample(range(number_of_iterations), k=max_number_of_iterations):
-            paint_final(simulation_collector["run #" + str(i)], 5, i)
+            paint_final(simulation_collector["run #" + str(i)], 5, i, config)
 
     plot_self_org_success_with_error(success_vs_self_org_dict["total"])
 
@@ -150,7 +149,7 @@ def plot_all_success(simulation_collector):
 def plot_self_org_with_flow_data(run_num, simulation_collector):
     """
     show the contribution of different agent types to the overall self_org_measure
-    first segment shows for the first three agent types and the last one shows for sensors.
+    first segment shows for the first three agent types and the last one shows for iiots.
 """
     x = list(simulation_collector["run #" + str(run_num)]['self_organization_measure'].keys())
     number_of_figs = 2
@@ -177,15 +176,15 @@ def plot_self_org_with_flow_data(run_num, simulation_collector):
         axis[1].legend(key, loc="upper right")
         bottom = [bottom[i] + measure[i] for i in range(len(bottom))]
 
-    original_array = np.array(list(simulation_collector["run #" + str(run_num)]['number_of_sensors'].values())[1:])
-    shifted_array = np.array(list(simulation_collector["run #" + str(run_num)]['number_of_sensors'].values())[:-1])
+    original_array = np.array(list(simulation_collector["run #" + str(run_num)]['number_of_iiots'].values())[1:])
+    shifted_array = np.array(list(simulation_collector["run #" + str(run_num)]['number_of_iiots'].values())[:-1])
     measure = original_array != shifted_array
-    # measure = [simulation_collector["run #" + str(run_num)]['number_of_sensors'][x[j]] !=
-    #            simulation_collector["run #" + str(run_num)]['number_of_sensors'][x[j-1]] for
-    #            j in range(1, len(simulation_collector["run #" + str(run_num)]['number_of_sensors']))]
+    # measure = [simulation_collector["run #" + str(run_num)]['number_of_iiots'][x[j]] !=
+    #            simulation_collector["run #" + str(run_num)]['number_of_iiots'][x[j-1]] for
+    #            j in range(1, len(simulation_collector["run #" + str(run_num)]['number_of_iiots']))]
     measure = np.insert(measure, 0, False)
     axis[1].bar(x, measure, bottom=bottom, width=0.1)
-    axis[1].legend("Sensors", loc="upper right")
+    axis[1].legend("iiots", loc="upper right")
 
 
 

@@ -5,34 +5,34 @@ class SimulationContext:
         self.config = config
 
         # Queues (The State)
-        self.sensor_array_queue = []
-        self.array_analysis_queue = []
-        self.analysis_array_queue = []
-        self.array_action_queue = []
-        self.action_array_queue = []
-        self.array_sensor_queue = []
-        self.analysis_sublist = []
+        self.iiot_bus_queue = []
+        self.bus_edge_queue = []
+        self.edge_bus_queue = []
+        self.bus_scada_queue = []
+        self.scada_bus_queue = []
+        self.bus_iiot_queue = []
+        self.edge_sublist = []
 
 
         # Agent Registries
-        self.sensor_list = []
+        self.iiot_list = []
         self.agent_flow_rates_by_type = {}
-        self.agent_flow_rates_by_type["Array"] = {}
-        self.agent_flow_rates_by_type["Analysis Station"] = {}
-        self.agent_flow_rates_by_type["Action Station"] = {}
-        self.number_of_sensors = {}
+        self.agent_flow_rates_by_type["Network Bus"] = {}
+        self.agent_flow_rates_by_type["Edge Processor"] = {}
+        self.agent_flow_rates_by_type["SCADA Actuator"] = {}
+        self.number_of_iiots = {}
 
         # Define Topology Mappings (Routing Logic)
         self.start_nodes = {
-            "sensor to array": self.sensor_array_queue,
-            "analysis to array": self.analysis_array_queue,
-            "action to array": self.action_array_queue
+            "iiot to bus": self.iiot_bus_queue,
+            "edge to bus": self.edge_bus_queue,
+            "scada to bus": self.scada_bus_queue
          }
 
         self.end_nodes = {
-            "array to analysis": self.array_analysis_queue,
-            "array to action": self.array_action_queue,
-            "array to sensor": self.array_sensor_queue
+            "bus to edge": self.bus_edge_queue,
+            "bus to scada": self.bus_scada_queue,
+            "bus to iiot": self.bus_iiot_queue
         }
 
         # Data Collection (The Logs)
@@ -43,9 +43,10 @@ class SimulationContext:
             self.data_age_by_type[key] ={}
 
         self.successful_operations = []
-        self.analysis_data_usage_time = []
-        self.action_data_usage_time =[]
+        self.edge_data_usage_time = []
+        self.scada_data_usage_time =[]
         self.timestep_list = []
         self.self_organization_measure = {}
+        self.successful_operations_total ={}
         self.successful_operations_total ={}
         self.total_resource = {}

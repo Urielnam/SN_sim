@@ -34,13 +34,13 @@ image_map2 = {
 }
 
 
-class ArrayDraw:
+class BusDraw:
     def __init__(self):
         self.item_presentation = []
         self.x = 5
         self.y = 20
         self.canvas = canvas
-        self.presentation = IsrElement("Array", self.x, self.y, 1290, start_row-30)
+        self.presentation = IsrElement("Network Bus", self.x, self.y, 1290, start_row-30)
 
     def arr_move_item(self, moved_item):
         # draw inside box
@@ -116,30 +116,30 @@ class PaintGrapic:
 
     def __init__(
             self,
-            sensor_array_queue,
-            array_sensor_queue,
-            array_analysis_queue,
-            analysis_sublist,
-            analysis_array_queue,
-            array_action_queue,
-            action_array_queue
+            iiot_bus_queue,
+            bus_iiot_queue,
+            bus_edge_queue,
+            edge_sublist,
+            edge_bus_queue,
+            bus_scada_queue,
+            scada_bus_queue
             ):
-        self.sensor_array = QueueGraphics(sensor_array_queue, 25, "Sensor to \n Array", 100)
-        self.array_sensor = QueueGraphics(array_sensor_queue, 25, "Array to \n Sensor", 200)
-        self.array_analysis = QueueGraphics(array_analysis_queue, 25, "Array to \n Analysis", 300)
-        self.analysis_sublist_visual = QueueGraphics(analysis_sublist, 25, "Analysis Station \n Bank", 600)
-        self.analysis_array = QueueGraphics(analysis_array_queue, 25, "Analysis to \n Array", 700)
-        self.array_action = QueueGraphics(array_action_queue, 25, "Array to \n Action", 800)
-        self.action_array = QueueGraphics(action_array_queue, 25, "Action to \n Array", 900)
+        self.iiot_bus = QueueGraphics(iiot_bus_queue, 25, "IIoT to \n Network Bus", 100)
+        self.bus_iiot = QueueGraphics(bus_iiot_queue, 25, "Network Bus to \n IIoT", 200)
+        self.bus_edge = QueueGraphics(bus_edge_queue, 25, "Network Bus to \n Edge Processor", 300)
+        self.edge_sublist_visual = QueueGraphics(edge_sublist, 25, "Edge Processor \n Bank", 600)
+        self.edge_bus = QueueGraphics(edge_bus_queue, 25, "Edge Processor to \n Network Bus", 700)
+        self.bus_scada = QueueGraphics(bus_scada_queue, 25, "Network Bus to \n SCADA Actuator", 800)
+        self.scada_bus = QueueGraphics(scada_bus_queue, 25, "SCADA Actuator to \n Network Bus", 900)
 
     def tick(self):
-        self.sensor_array.paint_queue()
-        self.array_sensor.paint_queue()
-        self.array_analysis.paint_queue()
-        self.analysis_array.paint_queue()
-        self.array_action.paint_queue()
-        self.action_array.paint_queue()
-        self.analysis_sublist_visual.paint_queue()
+        self.iiot_bus.paint_queue()
+        self.bus_iiot.paint_queue()
+        self.bus_edge.paint_queue()
+        self.edge_bus.paint_queue()
+        self.bus_scada.paint_queue()
+        self.scada_bus.paint_queue()
+        self.edge_sublist_visual.paint_queue()
 
 
 class ClockAndDataDraw:
@@ -164,25 +164,25 @@ class ClockAndDataDraw:
         self.data_plot = FigureCanvasTkAgg(f, master=main)
         self.data_plot.get_tk_widget().config(height=400)
         self.data_plot.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
-        self.sensor_list_visual = []
-        self.sensor_list = ctx.sensor_list
+        self.iiot_list_visual = []
+        self.iiot_list = ctx.iiot_list
         self.data_age = ctx.data_age
         self.data_age_by_type = ctx.data_age_by_type
         self.successful_operations_total = ctx.successful_operations_total
-        self.number_of_sensors = ctx.number_of_sensors
+        self.number_of_iiots = ctx.number_of_iiots
         self.agent_flow_rates_by_type = ctx.agent_flow_rates_by_type
         self.total_resource = ctx.total_resource
         self.self_organization_measure = ctx.self_organization_measure
 
-    def paint_sensors(self):
-        for i in self.sensor_list_visual:
-            to_del = self.sensor_list_visual.pop()
+    def paint_iiots(self):
+        for i in self.iiot_list_visual:
+            to_del = self.iiot_list_visual.pop()
             canvas.delete(to_del)
             canvas.update()
 
         n = 1
 
-        for x in self.sensor_list:
+        for x in self.iiot_list:
             element_name = x.name
             x_top = 5
             y_top = start_row + (regular_height + 10) * (n - 1)
@@ -190,8 +190,8 @@ class ClockAndDataDraw:
             length = 60
             height = regular_height
 
-            self.sensor_list_visual.append(canvas.create_rectangle(x_top, y_top, x_top + length, y_top + height))
-            self.sensor_list_visual.append(canvas.create_text(x_top + 10, y_top + 7, anchor=tk.NW,
+            self.iiot_list_visual.append(canvas.create_rectangle(x_top, y_top, x_top + length, y_top + height))
+            self.iiot_list_visual.append(canvas.create_text(x_top + 10, y_top + 7, anchor=tk.NW,
                                                               text=f"{element_name}"))
             canvas.update()
 
@@ -206,7 +206,7 @@ class ClockAndDataDraw:
         self.time = canvas.create_text(self.x1 + 10, self.y1 + 10, text="Time = " + str(round(time, 1)) + "m",
                                        anchor=tk.NW)
 
-        self.paint_sensors()
+        self.paint_iiots()
 
         a1.cla()
         a1.set_xlabel("Time")
@@ -235,9 +235,9 @@ class ClockAndDataDraw:
         a3.set_xlabel("Time")
         a3.set_ylabel("System Cost")
 
-        a3.plot([t for (t, a) in self.number_of_sensors.items()],
-                [a for (t, a) in self.number_of_sensors.items()],
-                label="Sensors")
+        a3.plot([t for (t, a) in self.number_of_iiots.items()],
+                [a for (t, a) in self.number_of_iiots.items()],
+                label="Iiots")
 
         for key in self.agent_flow_rates_by_type.keys():
             a3.plot([t for (t, a) in self.agent_flow_rates_by_type[key].items()],
@@ -264,7 +264,7 @@ class ClockAndDataDraw:
         self.canvas.update()
 
 
-class AnalysisStationDraw:
+class EdgeStationDraw:
     def __init__(self):
         self.station_item_presentation = []
         self.x = 405

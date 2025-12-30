@@ -12,14 +12,14 @@ def add_to_dict_arr(dic, key, val):
     else:
         dic[key] = [val]
 
-def calc_self_org_vectorized(dt, agent_flow_rates_by_type, number_of_sensors, env, timestep_list):
+def calc_self_org_vectorized(dt, agent_flow_rates_by_type, number_of_iiots, env, timestep_list):
     """
         Calculates self-organization using vectorized numpy operations.
 
         Args:
             dt: Time step.
             agent_flow_rates_by_type: Dictionary of agent flow rates.
-            number_of_sensors: Dictionary of sensor counts.
+            number_of_iiots: Dictionary of iiot counts.
             env: Simulation environment.
             timestep_list: List of time steps.
 
@@ -50,21 +50,21 @@ def calc_self_org_vectorized(dt, agent_flow_rates_by_type, number_of_sensors, en
             # print(changes)
 
 
-    sensor_counts = np.array(list(number_of_sensors.values()))
-    # limit the sensor count to the timestep limit
-    sensor_counts = sensor_counts[:timestep_limit]
-    if len(sensor_counts) < 2:
+    iiot_counts = np.array(list(number_of_iiots.values()))
+    # limit the iiot count to the timestep limit
+    iiot_counts = iiot_counts[:timestep_limit]
+    if len(iiot_counts) < 2:
         changes_by_key.append(0)
     else:
-        shifted_sensor_counts = np.roll(sensor_counts, 1)
-        shifted_sensor_counts[0] = sensor_counts[0]
-        sensor_changes = np.sum(sensor_counts != shifted_sensor_counts)
-        changes_by_key.append(sensor_changes)
+        shifted_iiot_counts = np.roll(iiot_counts, 1)
+        shifted_iiot_counts[0] = iiot_counts[0]
+        iiot_changes = np.sum(iiot_counts != shifted_iiot_counts)
+        changes_by_key.append(iiot_changes)
 
     return np.sum(changes_by_key)
 
 
-def calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env, timestep_list):
+def calc_self_org(dt, agent_flow_rates_by_type, number_of_iiots, env, timestep_list):
     changes_by_key = []
 
     # def wrapped_func():
@@ -84,8 +84,8 @@ def calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env, timestep
     change_count = 0
 
     for x in range(len(timestep_list) - 1):
-        if number_of_sensors[timestep_list[x]] != \
-                number_of_sensors[timestep_list[x + 1]]:
+        if number_of_iiots[timestep_list[x]] != \
+                number_of_iiots[timestep_list[x + 1]]:
             change_count += 1
     changes_by_key.append(change_count)
 
@@ -100,10 +100,10 @@ def calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env, timestep
 # calculate system self organization over time (for a2).
 def calc_self_org_over_time(ctx):
     # old function without numpy
-    result_self_org = calc_self_org(ctx.config.dt, ctx.agent_flow_rates_by_type, ctx.number_of_sensors, ctx.env,
+    result_self_org = calc_self_org(ctx.config.dt, ctx.agent_flow_rates_by_type, ctx.number_of_iiots, ctx.env,
                                     ctx.timestep_list)
     # new function with numpy
-    #result_self_org = calc_self_org_vectorized(dt, agent_flow_rates_by_type, number_of_sensors, env, timestep_list)
+    #result_self_org = calc_self_org_vectorized(dt, agent_flow_rates_by_type, number_of_iiots, env, timestep_list)
     add_to_dict_arr(ctx.self_organization_measure, float(ctx.env.now), result_self_org)
 
 
@@ -111,9 +111,9 @@ def calc_self_org_over_time(ctx):
 def calc_ages(ctx):
     # calculate average time for all objects.
 
-    ages = [ctx.env.now - data_object.time for data_object in (ctx.sensor_array_queue + ctx.array_analysis_queue +
-                                                           ctx.analysis_array_queue + ctx.array_action_queue +
-                                                           ctx.action_array_queue + ctx.array_sensor_queue)]
+    ages = [ctx.env.now - data_object.time for data_object in (ctx.iiot_bus_queue + ctx.bus_edge_queue +
+                                                           ctx.edge_bus_queue + ctx.bus_scada_queue +
+                                                           ctx.scada_bus_queue + ctx.bus_iiot_queue)]
 
     # data_age[float(env.now)].append(ages)
     add_to_dict_arr(ctx.data_age, float(ctx.env.now), ages)
@@ -121,11 +121,11 @@ def calc_ages(ctx):
     # for each key in image_map2 (data type)
     # in dict "data_age_by_type"
     # time now minus creation time.
-    # for the list of object with that data type in all 6 arrays
+    # for the list of object with that data type in all 6 busess
     for key in ctx.config.data_type_keys:
         add_to_dict_arr(ctx.data_age_by_type[key], float(ctx.env.now), [ctx.env.now - data_object.time for data_object in [
-                i for i in (ctx.sensor_array_queue + ctx.array_analysis_queue + ctx.analysis_array_queue +
-                            ctx.array_action_queue + ctx.action_array_queue + ctx.array_sensor_queue) if i.type == key]])
+                i for i in (ctx.iiot_bus_queue + ctx.bus_edge_queue + ctx.edge_bus_queue +
+                            ctx.bus_scada_queue + ctx.scada_bus_queue + ctx.bus_iiot_queue) if i.type == key]])
 
 
 # calculate measure of success over time (for a2)
@@ -136,20 +136,20 @@ def calc_success_over_time(ctx):
 
 
 # calculate number of objects over time (for a3)
-def calculate_number_of_objects(ctx, array, analysis_station, action_station):
-    add_to_dict_arr(ctx.number_of_sensors, float(ctx.env.now), (len(ctx.sensor_list)))
-    add_to_dict_arr(ctx.agent_flow_rates_by_type["Array"], float(ctx.env.now), array.flow_rate)
-    add_to_dict_arr(ctx.agent_flow_rates_by_type["Analysis Station"], float(ctx.env.now), analysis_station.flow_rate)
-    add_to_dict_arr(ctx.agent_flow_rates_by_type["Action Station"], float(ctx.env.now), action_station.flow_rate)
-    add_to_dict_arr(ctx.total_resource, float(ctx.env.now), len(ctx.sensor_list) + array.flow_rate + analysis_station.flow_rate + action_station.flow_rate)
+def calculate_number_of_objects(ctx, bus, edge, scada):
+    add_to_dict_arr(ctx.number_of_iiots, float(ctx.env.now), (len(ctx.iiot_list)))
+    add_to_dict_arr(ctx.agent_flow_rates_by_type["Network Bus"], float(ctx.env.now), bus.flow_rate)
+    add_to_dict_arr(ctx.agent_flow_rates_by_type["Edge Processor"], float(ctx.env.now), edge.flow_rate)
+    add_to_dict_arr(ctx.agent_flow_rates_by_type["SCADA Actuator"], float(ctx.env.now), scada.flow_rate)
+    add_to_dict_arr(ctx.total_resource, float(ctx.env.now), len(ctx.iiot_list) + bus.flow_rate + edge.flow_rate + scada.flow_rate)
 
 
 # accumulated function for all secondary calculation for the simulation.
-def clockanddatacalc_func(ctx, array, analysis_station, action_station):
+def clockanddatacalc_func(ctx, bus, edge, scada):
 
     prepare_timestep_list(ctx)
     calc_ages(ctx)
-    calculate_number_of_objects(ctx, array, analysis_station, action_station)
+    calculate_number_of_objects(ctx, bus, edge, scada)
     calc_self_org_over_time(ctx)
     calc_success_over_time(ctx)
 

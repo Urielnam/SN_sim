@@ -22,7 +22,7 @@ RUN_PARAMS = {
     "end_time": 1000,
     "max_resource": 100,
     "dt": 5,
-    "sensor_acc": 0.1,
+    "iiot_acc": 0.1,
     "self_org_active": False,
     "self_org_threshold": 35,
     "ui": False,
@@ -56,7 +56,7 @@ if __name__ == '__main__':
         end_time=RUN_PARAMS["end_time"],
         dt=RUN_PARAMS["dt"],
         max_resource=RUN_PARAMS["max_resource"],
-        sensor_acc=RUN_PARAMS["sensor_acc"],
+        iiot_acc=RUN_PARAMS["iiot_acc"],
         self_org_active=RUN_PARAMS["self_org_active"],
         self_org_threshold=RUN_PARAMS["self_org_threshold"],
         ui=RUN_PARAMS["ui"],
@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
     # function to analyze the proportions between self - org and accumulated success.
 
-    PlotClasses.multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_of_iterations)
+    PlotClasses.multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_of_iterations,current_config)
 
     # currently a function showing only one run. I want a function to stack different runs.
 
