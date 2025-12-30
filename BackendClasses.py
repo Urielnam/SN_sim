@@ -98,69 +98,60 @@ def calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env, timestep
 
 
 # calculate system self organization over time (for a2).
-def calc_self_org_over_time(self_organization_measure, env, dt, agent_flow_rates_by_type, number_of_sensors,
-                            timestep_list):
+def calc_self_org_over_time(ctx):
     # old function without numpy
-    result_self_org = calc_self_org(dt, agent_flow_rates_by_type, number_of_sensors, env, timestep_list)
+    result_self_org = calc_self_org(ctx.config.dt, ctx.agent_flow_rates_by_type, ctx.number_of_sensors, ctx.env,
+                                    ctx.timestep_list)
     # new function with numpy
     #result_self_org = calc_self_org_vectorized(dt, agent_flow_rates_by_type, number_of_sensors, env, timestep_list)
-    add_to_dict_arr(self_organization_measure, float(env.now), result_self_org)
+    add_to_dict_arr(ctx.self_organization_measure, float(ctx.env.now), result_self_org)
 
 
 # calculate data type age over time (for a1).
-def calc_ages(data_type_keys, data_age_by_type, env, sensor_array_queue, array_analysis_queue, analysis_array_queue,
-              array_action_queue, action_array_queue, array_sensor_queue, data_age):
+def calc_ages(ctx):
     # calculate average time for all objects.
 
-    ages = [env.now - data_object.time for data_object in (sensor_array_queue + array_analysis_queue +
-                                                           analysis_array_queue + array_action_queue +
-                                                           action_array_queue + array_sensor_queue)]
+    ages = [ctx.env.now - data_object.time for data_object in (ctx.sensor_array_queue + ctx.array_analysis_queue +
+                                                           ctx.analysis_array_queue + ctx.array_action_queue +
+                                                           ctx.action_array_queue + ctx.array_sensor_queue)]
 
     # data_age[float(env.now)].append(ages)
-    add_to_dict_arr(data_age, float(env.now), ages)
+    add_to_dict_arr(ctx.data_age, float(ctx.env.now), ages)
 
     # for each key in image_map2 (data type)
     # in dict "data_age_by_type"
     # time now minus creation time.
     # for the list of object with that data type in all 6 arrays
-    for key in data_type_keys:
-        add_to_dict_arr(data_age_by_type[key], float(env.now), [env.now - data_object.time for data_object in [
-                i for i in (sensor_array_queue + array_analysis_queue + analysis_array_queue +
-                            array_action_queue + action_array_queue + array_sensor_queue) if i.type == key]])
+    for key in ctx.config.data_type_keys:
+        add_to_dict_arr(ctx.data_age_by_type[key], float(ctx.env.now), [ctx.env.now - data_object.time for data_object in [
+                i for i in (ctx.sensor_array_queue + ctx.array_analysis_queue + ctx.analysis_array_queue +
+                            ctx.array_action_queue + ctx.action_array_queue + ctx.array_sensor_queue) if i.type == key]])
 
 
 # calculate measure of success over time (for a2)
 # was 66.7s out of a total of 179s
-def calc_success_over_time(successful_operations_total, env, successful_operations, dt):
-    index = bisect.bisect_right(successful_operations, env.now - dt)
-    add_to_dict_arr(successful_operations_total, float(env.now), len(successful_operations)-index)
+def calc_success_over_time(ctx):
+    index = bisect.bisect_right(ctx.successful_operations, ctx.env.now - ctx.config.dt)
+    add_to_dict_arr(ctx.successful_operations_total, float(ctx.env.now), len(ctx.successful_operations)-index)
 
 
 # calculate number of objects over time (for a3)
-def calculate_number_of_objects(number_of_sensors, env, sensor_list, agent_flow_rates_by_type, array, analysis_station,
-                                action_station, total_resource):
-    add_to_dict_arr(number_of_sensors, float(env.now), (len(sensor_list)))
-    add_to_dict_arr(agent_flow_rates_by_type["Array"], float(env.now), array.flow_rate)
-    add_to_dict_arr(agent_flow_rates_by_type["Analysis Station"], float(env.now), analysis_station.flow_rate)
-    add_to_dict_arr(agent_flow_rates_by_type["Action Station"], float(env.now), action_station.flow_rate)
-    add_to_dict_arr(total_resource, float(env.now), len(sensor_list) + array.flow_rate + analysis_station.flow_rate + action_station.flow_rate)
+def calculate_number_of_objects(ctx, array, analysis_station, action_station):
+    add_to_dict_arr(ctx.number_of_sensors, float(ctx.env.now), (len(ctx.sensor_list)))
+    add_to_dict_arr(ctx.agent_flow_rates_by_type["Array"], float(ctx.env.now), array.flow_rate)
+    add_to_dict_arr(ctx.agent_flow_rates_by_type["Analysis Station"], float(ctx.env.now), analysis_station.flow_rate)
+    add_to_dict_arr(ctx.agent_flow_rates_by_type["Action Station"], float(ctx.env.now), action_station.flow_rate)
+    add_to_dict_arr(ctx.total_resource, float(ctx.env.now), len(ctx.sensor_list) + array.flow_rate + analysis_station.flow_rate + action_station.flow_rate)
 
 
 # accumulated function for all secondary calculation for the simulation.
-def clockanddatacalc_func(data_type_keys, data_age_by_type, env, sensor_array_queue, array_analysis_queue,
-                          analysis_array_queue, array_action_queue, action_array_queue, array_sensor_queue,
-                          data_age, self_organization_measure, dt, agent_flow_rates_by_type, number_of_sensors,
-                          successful_operations_total, successful_operations, sensor_list, array, analysis_station,
-                          action_station, total_resource, timestep_list):
-    prepare_timestep_list(timestep_list, dt, env)
+def clockanddatacalc_func(ctx, array, analysis_station, action_station):
 
-    calc_ages(data_type_keys, data_age_by_type, env, sensor_array_queue, array_analysis_queue, analysis_array_queue,
-              array_action_queue, action_array_queue, array_sensor_queue, data_age)
-    calculate_number_of_objects(number_of_sensors, env, sensor_list, agent_flow_rates_by_type, array, analysis_station,
-                                action_station, total_resource)
-    calc_self_org_over_time(self_organization_measure, env, dt, agent_flow_rates_by_type, number_of_sensors,
-                            timestep_list)
-    calc_success_over_time(successful_operations_total, env, successful_operations, dt)
+    prepare_timestep_list(ctx)
+    calc_ages(ctx)
+    calculate_number_of_objects(ctx, array, analysis_station, action_station)
+    calc_self_org_over_time(ctx)
+    calc_success_over_time(ctx)
 
 
 def calc_average_stdev(success_vs_self_org_dict):
@@ -189,8 +180,8 @@ def calc_success_vs_self_org(self_organization_measure_dict, successful_operatio
     return success_vs_self_org_dict
 
 
-def prepare_timestep_list(timestep_list, dt, env):
-    if len(timestep_list) >= dt*10:
-        timestep_list.pop(0)
-    timestep_list.append(float(env.now))
+def prepare_timestep_list(ctx):
+    if len(ctx.timestep_list) >= ctx.config.dt*10:
+        ctx.timestep_list.pop(0)
+    ctx.timestep_list.append(float(ctx.env.now))
 

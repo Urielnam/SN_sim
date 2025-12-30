@@ -16,18 +16,20 @@ import Data_collector as DC
 import psutil
 import os
 
-ui = False
-print_excel = False
+from sim_config import SimulationConfig
 
-end_time = 1000
-number_of_iterations = 4
-max_resource = 100
-dt = 5
-self_org_feedback_activate = False
-threshold_self_org_value = 35
-success_vs_self_org_dict = {}
-success_vs_self_org_dict = {'total': {}}
-sensor_acc = 0.1
+RUN_PARAMS = {
+    "end_time": 1000,
+    "max_resource": 100,
+    "dt": 5,
+    "sensor_acc": 0.1,
+    "self_org_active": False,
+    "self_org_threshold": 35,
+    "ui": False,
+    "print_excel": False
+}
+
+number_of_iterations = 1
 
 # we can run the simulation multiple times and then show the self-org/accumulated success for each
 # separately and together
@@ -38,9 +40,8 @@ def memory_check():
     print(process.memory_info().rss / (1024 * 1024), "MB")
 
 
-def work(sim_coll, ind, dt):
-    DC.run_simulation(sim_coll, ind, ui, print_excel, end_time, max_resource, dt, self_org_feedback_activate,
-                      threshold_self_org_value, sensor_acc)
+def work(sim_coll, ind, config):
+    DC.run_simulation(sim_coll, ind, config)
     memory_check()
 
 
@@ -48,12 +49,26 @@ if __name__ == '__main__':
     processes = []
     manager = multiprocessing.Manager()
     simulation_collector = manager.dict()
+    success_vs_self_org_dict = {'total':{}}
+
+    # Create the Configuration Object
+    current_config = SimulationConfig(
+        end_time=RUN_PARAMS["end_time"],
+        dt=RUN_PARAMS["dt"],
+        max_resource=RUN_PARAMS["max_resource"],
+        sensor_acc=RUN_PARAMS["sensor_acc"],
+        self_org_active=RUN_PARAMS["self_org_active"],
+        self_org_threshold=RUN_PARAMS["self_org_threshold"],
+        ui=RUN_PARAMS["ui"],
+        print_excel=RUN_PARAMS["print_excel"]
+    )
 
     for i in range(number_of_iterations):
         simulation_collector["run #" + str(i)] = {}
+
         p = multiprocessing.Process(
             target=work,
-            args=(simulation_collector, i, dt)
+            args=(simulation_collector, i, current_config)
         )
         processes.append(p)
         p.start()
@@ -62,12 +77,11 @@ if __name__ == '__main__':
         pro.join()
 
     DC.build_run_dict(simulation_collector, success_vs_self_org_dict)
-
     BackendClasses.calc_average_stdev(success_vs_self_org_dict["total"])
 
     # function to analyze the proportions between self - org and accumulated success.
 
-    PlotClasses.multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_of_iterations, dt)
+    PlotClasses.multiple_plot_graphs(simulation_collector, success_vs_self_org_dict, number_of_iterations)
 
     # currently a function showing only one run. I want a function to stack different runs.
 

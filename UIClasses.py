@@ -144,8 +144,7 @@ class PaintGrapic:
 
 class ClockAndDataDraw:
 
-    def __init__(self, x1, y1, x2, y2, time, sensor_list, data_age, data_age_by_type, successful_operations_total,
-                 number_of_sensors, agent_flow_rates_by_type, total_resource, self_organization_measure):
+    def __init__(self, ctx, x1, y1, x2, y2, time):
         # Draw the inital state of the clock and data on the canvas
         self.x1 = x1
         self.y1 = y1
@@ -166,14 +165,14 @@ class ClockAndDataDraw:
         self.data_plot.get_tk_widget().config(height=400)
         self.data_plot.get_tk_widget().pack(side=tk.BOTTOM, fill=tk.BOTH, expand=True)
         self.sensor_list_visual = []
-        self.sensor_list = sensor_list
-        self.data_age = data_age
-        self.data_age_by_type = data_age_by_type
-        self.successful_operations_total = successful_operations_total
-        self.number_of_sensors = number_of_sensors
-        self.agent_flow_rates_by_type = agent_flow_rates_by_type
-        self.total_resource = total_resource
-        self.self_organization_measure = self_organization_measure
+        self.sensor_list = ctx.sensor_list
+        self.data_age = ctx.data_age
+        self.data_age_by_type = ctx.data_age_by_type
+        self.successful_operations_total = ctx.successful_operations_total
+        self.number_of_sensors = ctx.number_of_sensors
+        self.agent_flow_rates_by_type = ctx.agent_flow_rates_by_type
+        self.total_resource = ctx.total_resource
+        self.self_organization_measure = ctx.self_organization_measure
 
     def paint_sensors(self):
         for i in self.sensor_list_visual:
@@ -286,10 +285,10 @@ class AnalysisStationDraw:
             canvas.update()
 
 
-def save_graph(env, end_time, now):
-    yield env.timeout(end_time-0.1)
+def save_graph(ctx, now):
+    yield ctx.env.timeout(ctx.config.end_time-0.1)
 
-    save_name = "self_org_plot end_time_" + str(end_time)
+    save_name = "self_org_plot end_time_" + str(ctx.config.end_time)
 
     DATA_DIR = create_folder(save_name, now)
 

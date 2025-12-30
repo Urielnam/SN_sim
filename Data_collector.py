@@ -2,10 +2,8 @@ import Simulation
 import BackendClasses
 
 
-def run_simulation(simulation_collector, i, ui, print_excel, end_time, max_resource, dt, self_org_feedback_activate,
-                   threshold_self_org_value, sensor_acc):
-    temp_run = Simulation.main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_activate,
-                                   threshold_self_org_value, sensor_acc)
+def run_simulation(simulation_collector, i, config):
+    temp_run = Simulation.main_run(config)
     simulation_collector["run #" + str(i)] = temp_run
 
 

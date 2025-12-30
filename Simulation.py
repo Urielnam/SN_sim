@@ -3,9 +3,9 @@ import random
 import pandas as pd
 from datetime import datetime
 
-from collections import defaultdict
 from BackendClasses import clockanddatacalc_func
-# import UIClasses
+
+from sim_context import SimulationContext
 
 # -------------------------
 # SIMULATION
@@ -32,113 +32,23 @@ class Data:
 # data to include
 # all plotted data - need to check how it's done maybe?
 
-def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_activate, threshold_self_org_value,sensor_acc):
-    if ui:
+def main_run(config):
+
+    if config.ui:
         import UIClasses
-    # declare all required dictionaries so they can be deleted at the end of the run
 
-    # -------------------------
-    # CONFIGURATION
-    # -------------------------
-
-    data_age = {}
-    data_age_by_type = {}
-    successful_operations = []
-
-    timestep_list = []
-  
-    successful_operations_total = {}
-    number_of_sensors = {}
-    agent_flow_rates_by_type = {}
-    agent_flow_rates_by_type["Array"] = {}
-    agent_flow_rates_by_type["Analysis Station"] = {}
-    agent_flow_rates_by_type["Action Station"] = {}
-    total_resource = {}
-    self_organization_measure = {}
-
-    # max_resource = 15
-    # end_time = 20
-
-    # done: replace this to an external function
-    # ui = False
-    # UI_obj = {}
-    # -------------------------
-    # ANALYTICAL GLOBALS
-    # -------------------------
-
-    # Bits queue
-    sensor_array_queue = []
-    array_analysis_queue = []
-    analysis_array_queue = []
-    array_action_queue = []
-    action_array_queue = []
-    array_sensor_queue = []
-    analysis_sublist = []
-    sensor_list = []
-    # array that will save the time from data creation to data use at the analysis station.
-    analysis_data_usage_time = []
-    # array to save the time from data analysis to data usage.
-    action_data_usage_time = []
-
-    # graph_list = [sensor_array_queue, analysis_array_queue, action_array_queue,
-    #               array_analysis_queue, array_action_queue,
-    #               array_sensor_queue]
-
-    start_nodes = {
-        "sensor to array": sensor_array_queue,
-        "analysis to array": analysis_array_queue,
-        "action to array": action_array_queue
-    }
-
-    end_nodes = {
-        "array to analysis": array_analysis_queue,
-        "array to action": array_action_queue,
-        "array to sensor": array_sensor_queue
-    }
-
-    connecting_graph = {
-        "action to array": {
-            "intel": "array to analysis",
-            "feedback": "array to analysis",
-            "target": "array to analysis"
-        },
-        "analysis to array": {
-            "intel": "array to action",
-            "feedback": "array to sensor",
-            "target": "array to action"
-        },
-        "sensor to array": {
-            "intel": "array to analysis",
-            "feedback": "array to analysis",
-            "target": "array to analysis"
-        }
-    }
-
-    static_image_map_keys = ["intel", "feedback", "target"]
-
-    # used for backend classes calculation
-    for key in static_image_map_keys:
-        data_age_by_type[key] = {}
-
-
-    # start_row = 95
-    # regular_height = 30
     now = datetime.now().ctime()
     now = now.replace(":", "_")
 
-    def create_clock(env, array, analysis_station, action_station, ui, clock, UI_obj):
+    def create_clock(ctx, array, analysis_station, action_station, clock, UI_obj):
         # This generator is meant to be used as a SimPy event to update the clock and the data in the UI
 
         while True:
-            yield env.timeout(0.1)
-            clockanddatacalc_func(data_type_keys, data_age_by_type, env, sensor_array_queue, array_analysis_queue,
-                                  analysis_array_queue, array_action_queue, action_array_queue, array_sensor_queue,
-                                  data_age, self_organization_measure, dt, agent_flow_rates_by_type, number_of_sensors,
-                                  successful_operations_total, successful_operations, sensor_list, array,
-                                  analysis_station, action_station, total_resource,timestep_list)
+            yield ctx.env.timeout(0.1)
+            clockanddatacalc_func(ctx, array, analysis_station, action_station)
 
-            if ui:
-                clock.tick(env.now)
+            if config.ui:
+                clock.tick(ctx.env.now)
                 UI_obj.tick()
 
 
@@ -146,8 +56,9 @@ def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_acti
     # Info has real/wrong status
     # Intel generated is randomly selected to be true or false with a certain precentage.
     class Sensor(object):
-        def __init__(self, correctness_probability, order, external_environemnt):
-            self.env = external_environemnt
+        def __init__(self, ctx, correctness_probability, order):
+            self.ctx = ctx
+            self.env = ctx.env
             self.action = self.env.process(self.run())
             self.correctness_probability = correctness_probability
             self.order = order
@@ -158,19 +69,20 @@ def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_acti
             while self.is_alive:
                 # print('Create new info bit at time %d' % env.now)
                 yield self.env.timeout(1)
-                sensor_array_queue.append(Data(random.random() < self.correctness_probability,
+                self.ctx.sensor_array_queue.append(Data(random.random() < self.correctness_probability,
                                                self.env.now, 'intel', self.name))
 
     # The array moves data between different queues. It can move only one object per lane.
     class Array(object):
-        def __init__(self, external_environemnt, ui_flag):
-            self.env = external_environemnt
+        def __init__(self, ctx):
+            self.ctx = ctx
+            self.env = ctx.env
             self.action = self.env.process(self.run())
-            self.ui_flag = ui_flag
+            self.ui_flag = ctx.config.ui
 
             self.flow_rate = 1
 
-            if ui_flag:
+            if self.ui_flag:
                 self.arr = UIClasses.ArrayDraw()
 
         def move_item(self, queue_from, queue_to):
@@ -193,26 +105,27 @@ def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_acti
 
                 # for each lane, move one data unit per time
                 for i in range(self.flow_rate):
-                    if check_queue() == 0:
+                    if check_queue(self.ctx) == 0:
                         yield self.env.timeout(1)
                         break
-                    selected_array = random.choice([x for x in start_nodes.keys() if len(start_nodes[x]) > 0])
-                    second_array = connecting_graph[selected_array][start_nodes[selected_array][0].type]
-                    yield self.env.process(self.move_item(start_nodes[selected_array], end_nodes[second_array]))
+                    selected_array = random.choice([x for x in ctx.start_nodes.keys() if len(ctx.start_nodes[x]) > 0])
+                    second_array = ctx.config.connecting_graph[selected_array][ctx.start_nodes[selected_array][0].type]
+                    yield self.env.process(self.move_item(ctx.start_nodes[selected_array], ctx.end_nodes[second_array]))
 
-    def check_queue():
-        return len(sensor_array_queue) + len(analysis_array_queue) + len(action_array_queue)
+    def check_queue(ctx):
+        return len(ctx.sensor_array_queue) + len(ctx.analysis_array_queue) + len(ctx.action_array_queue)
 
     # need to create analysis station, then action station and then start messing with accuracy.
     # if one of the intel is true, the intel is correct and the boogie is found. if both are false, the attack failes.
     # I need to change it so it ingests one intel article per cycle.
     class AnalysisStation(object):
-        def __init__(self, external_environemnt, ui_flag):
-            self.env = external_environemnt
-            self.action = external_environemnt.process(self.run())
-            self.ui_flag = ui_flag
+        def __init__(self, ctx):
+            self.ctx = ctx
+            self.env = ctx.env
+            self.action = ctx.env.process(self.run())
+            self.ui_flag = ctx.config.ui
             self.flow_rate = 1
-            if ui_flag:
+            if self.ui_flag:
                 self.draw = UIClasses.AnalysisStationDraw()
 
         def run(self):
@@ -222,13 +135,13 @@ def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_acti
 
                 bank_size = 2
 
-                if len(array_analysis_queue) == 0:
+                if len(self.ctx.array_analysis_queue) == 0:
                     yield self.env.timeout(1)
 
                 else:
-                    moved_item = array_analysis_queue[0]
-                    array_analysis_queue.pop(0)
-                    analysis_data_usage_time.append(self.env.now - moved_item.time)
+                    moved_item = self.ctx.array_analysis_queue[0]
+                    self.ctx.array_analysis_queue.pop(0)
+                    self.ctx.analysis_data_usage_time.append(self.env.now - moved_item.time)
 
                     if self.ui_flag:
                         self.draw.run_draw(moved_item)
@@ -239,74 +152,75 @@ def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_acti
                         self.draw.run_delete()
 
                     if moved_item.type == 'feedback':
-                        analysis_array_queue.append(moved_item)
+                        self.ctx.analysis_array_queue.append(moved_item)
 
                     # if data type is info, save it for digestion
                     else:
                         # add data to data bank.
-                        analysis_sublist.append(moved_item)
+                        self.ctx.analysis_sublist.append(moved_item)
 
                         # if bank size is equal to bank_size, delete bank and create new data
-                        if len(analysis_sublist) == bank_size:
-                            analysis_array_queue.append(Data(analysis_sublist[0].status or analysis_sublist[1].status,
+                        if len(self.ctx.analysis_sublist) == bank_size:
+                            self.ctx.analysis_array_queue.append(Data(ctx.analysis_sublist[0].status or self.ctx.analysis_sublist[1].status,
                                                              self.env.now, 'target',
-                                                             random.choice(analysis_sublist).creator))
-                            analysis_sublist.pop(0)
-                            analysis_sublist.pop(0)
+                                                             random.choice(self.ctx.analysis_sublist).creator))
+                            self.ctx.analysis_sublist.pop(0)
+                            self.ctx.analysis_sublist.pop(0)
 
     # action_station acts when there is intel in the pipeline
     class ActionStation(object):
-        def __init__(self, external_environemnt):
-            self.env = external_environemnt
+        def __init__(self, ctx):
+            self.ctx = ctx
+            self.env = ctx.env
             self.action = self.env.process(self.run())
             self.flow_rate = 1
 
         def run(self):
             while True:
 
-                if len(array_action_queue) > 0:
-                    a = array_action_queue[0]
-                    array_action_queue.pop(0)
-                    action_data_usage_time.append(self.env.now - a.time)
+                if len(self.ctx.array_action_queue) > 0:
+                    a = self.ctx.array_action_queue[0]
+                    self.ctx.array_action_queue.pop(0)
+                    self.ctx.action_data_usage_time.append(self.env.now - a.time)
                     yield self.env.timeout(1 / self.flow_rate)
                     # print(array_action_queue[0].status)
                     if a.status:
                         # print("Attack successful!")
                         # send back positive feedback
-                        action_array_queue.append(Data(True, self.env.now,
+                        self.ctx.action_array_queue.append(Data(True, self.env.now,
                                                        'feedback', a.creator))
-                        successful_operations.append(self.env.now)
+                        self.ctx.successful_operations.append(self.env.now)
                     if not a.status:
                         # print("Attack failed")
                         # send back negative feedback
-                        action_array_queue.append(Data(False, self.env.now,
+                        self.ctx.action_array_queue.append(Data(False, self.env.now,
                                                        'feedback', a.creator))
 
                 else:
                     yield self.env.timeout(1)
 
-    def check_max_resource(array, analysis_station, action_station):
-        return (len(sensor_list) + array.flow_rate +
+    def check_max_resource(ctx, array, analysis_station, action_station):
+        return (len(ctx.sensor_list) + array.flow_rate +
                 analysis_station.flow_rate +
-                action_station.flow_rate) < max_resource
+                action_station.flow_rate) < ctx.config.max_resource
 
-    def create_new_sensor(sensor_number, external_environemnt):
+    def create_new_sensor(sensor_number, ctx):
         # set a random number for the chances of giving good info.
         # sensor accuracy = sensor_acc.
-        sensor_chance = sensor_acc*random.random()
+        sensor_chance = config.sensor_acc*random.random()
         # add new sensor
-        sensor_list.append(Sensor(sensor_chance, sensor_number, external_environemnt))
+        ctx.sensor_list.append(Sensor(ctx, sensor_chance, sensor_number))
         # increase sensor count
         return sensor_number + 1
 
-    def kill_sensor(sensor):
+    def kill_sensor(ctx, sensor):
         sensor.is_alive = False
-        sensor_list.remove(sensor)
+        ctx.sensor_list.remove(sensor)
 
     # we need to select how much we change the number of sensors, and then execute it.
 
 
-    def sensor_maker(external_environemnt, array, analysis_station, action_station):
+    def sensor_maker(ctx, array, analysis_station, action_station):
         sensor_number = 2
 
         while True:
@@ -326,35 +240,35 @@ def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_acti
             # CURRENT LOGIC
             # -------------------------------------------
             # while there are any feedback data:
-            while len(array_sensor_queue) > 0:
+            while len(ctx.array_sensor_queue) > 0:
 
                 # if action feedback is good, create new sensor and kill the data.
                 # if action is right:
-                if array_sensor_queue[0].status:
+                if ctx.array_sensor_queue[0].status:
 
                     # if there are enough resources - grow the number of sensors. else - do nothing.
-                    if check_max_resource(array, analysis_station, action_station):
-                        sensor_number = create_new_sensor(sensor_number, external_environemnt)
+                    if check_max_resource(ctx, array, analysis_station, action_station):
+                        sensor_number = create_new_sensor(sensor_number, ctx)
                     # kill the data, even if you did not create a sensor.
-                    array_sensor_queue.pop(0)
+                    ctx.array_sensor_queue.pop(0)
                 # else, if actions is wrong and failed.
                 else:
-                    b = array_sensor_queue[0]
-                    for sensor in sensor_list.copy():
+                    b = ctx.array_sensor_queue[0]
+                    for sensor in ctx.sensor_list.copy():
                         # find the rouge sensor and kill it.
                         if sensor.name == b.creator:
-                            kill_sensor(sensor)
+                            kill_sensor(ctx, sensor)
                     # if the sensor list is empty, create a new sensor.
-                    if len(sensor_list) == 0:
-                        sensor_number = create_new_sensor(sensor_number, external_environemnt)
-                    array_sensor_queue.pop(0)
+                    if len(ctx.sensor_list) == 0:
+                        sensor_number = create_new_sensor(sensor_number, ctx.env)
+                    ctx.array_sensor_queue.pop(0)
 
             # if we are at max resource, reduce the number of sensors
-            if not check_max_resource(array, analysis_station, action_station) and len(sensor_list) > 1:
-                selected_sensor = random.choice(sensor_list)
-                kill_sensor(selected_sensor)
+            if not check_max_resource(ctx, array, analysis_station, action_station) and len(ctx.sensor_list) > 1:
+                selected_sensor = random.choice(ctx.sensor_list)
+                kill_sensor(ctx, selected_sensor)
 
-            if self_org_feedback_activate:
+            if config.self_org_active:
                 """
                 main goal - if self-org is less than 10, have every agent type "vibrate".
                 check if condition is applied.
@@ -365,114 +279,117 @@ def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_acti
                 try to decrease (enough spare to decrease?)
                 if failed - do nothing.
                 """
-                if len(self_organization_measure) > 600:
-                    if list(self_organization_measure.values())[-1][0] < threshold_self_org_value:
-                        if len(sensor_list) == list(number_of_sensors.values())[-1][0]:
-                            if check_max_resource(array, analysis_station, action_station):
-                                sensor_number = create_new_sensor(sensor_number, external_environemnt)
+                if len(ctx.self_organization_measure) > 600:
+                    if list(ctx.self_organization_measure.values())[-1][0] < ctx.config.self_org_threshold:
+                        if len(ctx.sensor_list) == list(ctx.number_of_sensors.values())[-1][0]:
+                            if check_max_resource(ctx, array, analysis_station, action_station):
+                                sensor_number = create_new_sensor(sensor_number, ctx.env)
                             else:
-                                if len(sensor_list) > 1:
-                                    removed_sensor = random.choice(sensor_list.copy())
-                                    kill_sensor(removed_sensor)
+                                if len(ctx.sensor_list) > 1:
+                                    removed_sensor = random.choice(ctx.sensor_list.copy())
+                                    kill_sensor(ctx, removed_sensor)
 
-            yield external_environemnt.timeout(0.1)
+            yield ctx.env.timeout(0.1)
 
     # same as previous logic, only with general object
     # object could be array, analysis station or action upgrade
-    def increase_self_org(object, object_name):
+    def increase_self_org(ctx, object, object_name):
 
-        if self_org_feedback_activate:
-            if len(self_organization_measure) > 600:
-                if list(self_organization_measure.values())[-1][0] < threshold_self_org_value:
-                    if object.flow_rate == list(agent_flow_rates_by_type[object_name].values())[-1]:
-                        if check_max_resource(array, analysis_station, action_station):
+        if config.self_org_active:
+            if len(ctx.self_organization_measure) > 600:
+                if list(ctx.self_organization_measure.values())[-1][0] < ctx.config.self_org_threshold:
+                    if object.flow_rate == list(ctx.agent_flow_rates_by_type[object_name].values())[-1]:
+                        if check_max_resource(ctx, array, analysis_station, action_station):
                             object.flow_rate = object.flow_rate + 1
                         else:
                             if object.flow_rate > 1:
                                 object.flow_rate = object.flow_rate - 1
 
-    def array_upgrade(env, array, analysis_station, action_station):
+    def array_upgrade(ctx, array, analysis_station, action_station):
         while True:
-            if check_queue() < (array.flow_rate - 1) * 5 and array.flow_rate > 1:
+            if check_queue(ctx) < (array.flow_rate - 1) * 5 and array.flow_rate > 1:
                 array.flow_rate = array.flow_rate - 1
-            if check_max_resource(array, analysis_station, action_station):
-                while check_queue() > array.flow_rate * 5:
+            if check_max_resource(ctx, array, analysis_station, action_station):
+                while check_queue(ctx) > array.flow_rate * 5:
                     array.flow_rate = array.flow_rate + 1
-            increase_self_org(array, "Array")
-            yield env.timeout(0.1)
+            increase_self_org(ctx, array, "Array")
+            yield ctx.env.timeout(0.1)
 
-    def analysis_upgrade(env, analysis_station, array, action_station):
+    def analysis_upgrade(ctx, analysis_station, array, action_station):
         while True:
-            if len(array_analysis_queue) < (analysis_station.flow_rate - 1) * 5 and analysis_station.flow_rate > 1:
+            if len(ctx.array_analysis_queue) < (analysis_station.flow_rate - 1) * 5 and analysis_station.flow_rate > 1:
                 analysis_station.flow_rate = analysis_station.flow_rate - 1
-            if check_max_resource(array, analysis_station, action_station):
-                while len(array_analysis_queue) > analysis_station.flow_rate * 5:
+            if check_max_resource(ctx, array, analysis_station, action_station):
+                while len(ctx.array_analysis_queue) > analysis_station.flow_rate * 5:
                     analysis_station.flow_rate = analysis_station.flow_rate + 1
-            increase_self_org(analysis_station, "Analysis Station")
-            yield env.timeout(0.1)
+            increase_self_org(ctx, analysis_station, "Analysis Station")
+            yield ctx.env.timeout(0.1)
 
-    def action_upgrade(env, action_station, array, analysis_station):
+    def action_upgrade(ctx, action_station, array, analysis_station):
         while True:
-            if len(array_action_queue) < (action_station.flow_rate - 1) * 5 and action_station.flow_rate > 1:
+            if len(ctx.array_action_queue) < (action_station.flow_rate - 1) * 5 and action_station.flow_rate > 1:
                 action_station.flow_rate = action_station.flow_rate - 1
-            if check_max_resource(array, analysis_station, action_station):
-                while len(array_action_queue) > action_station.flow_rate * 5:
+            if check_max_resource(ctx, array, analysis_station, action_station):
+                while len(ctx.array_action_queue) > action_station.flow_rate * 5:
                     action_station.flow_rate = action_station.flow_rate + 1
-            increase_self_org(action_station, "Action Station")
-            yield env.timeout(1.1)
+            increase_self_org(ctx, action_station, "Action Station")
+            yield ctx.env.timeout(1.1)
 
     # original function
     clock = {}
     UI_obj = {}
 
-    if ui:
-        UI_obj = UIClasses.PaintGrapic(
-            sensor_array_queue,
-            array_sensor_queue,
-            array_analysis_queue,
-            analysis_sublist,
-            analysis_array_queue,
-            array_action_queue,
-            action_array_queue)
-
-        clock = UIClasses.ClockAndDataDraw(1100, 260, 1290, 340, 0, sensor_list, data_age, data_age_by_type,
-                                           successful_operations_total, number_of_sensors, agent_flow_rates_by_type,
-                                           total_resource, self_organization_measure)
-
-    if ui:
+    if config.ui:
         env = simpy.rt.RealtimeEnvironment(factor=0.1, strict=False)
+        ctx = SimulationContext(env, config)
+
+        UI_obj = UIClasses.PaintGrapic(
+            ctx.sensor_array_queue,
+            ctx.array_sensor_queue,
+            ctx.array_analysis_queue,
+            ctx.analysis_sublist,
+            ctx.analysis_array_queue,
+            ctx.array_action_queue,
+            ctx.action_array_queue)
+
+        clock = UIClasses.ClockAndDataDraw(ctx,1100, 260, 1290, 340, 0)
+
     else:
         # do not remove, it's a faster env function:
         env = simpy.Environment()
+        ctx = SimulationContext(env, config)
 
-    array = Array(env, ui)
-    action_station = ActionStation(env)
-    analysis_station = AnalysisStation(env, ui)
-    env.process(create_clock(env, array, analysis_station, action_station, ui, clock, UI_obj))
 
-    sensor_list.append(Sensor(0.5, 1, env))
-    env.process(sensor_maker(env, array, analysis_station, action_station))
-    env.process(array_upgrade(env, array, analysis_station, action_station))
-    env.process(analysis_upgrade(env, analysis_station, array, action_station))
-    env.process(action_upgrade(env, action_station, array, analysis_station))
-    if ui:
-        env.process(UIClasses.save_graph(env, end_time, now))
 
-    env.run(until=end_time)
+    array = Array(ctx)
+    action_station = ActionStation(ctx)
+    analysis_station = AnalysisStation(ctx)
+    env.process(create_clock(ctx, array, analysis_station, action_station, clock, UI_obj))
 
-    if ui:
+    ctx.sensor_list.append(Sensor(ctx,0.5, 1))
+    env.process(sensor_maker(ctx, array, analysis_station, action_station))
+    env.process(array_upgrade(ctx, array, analysis_station, action_station))
+    env.process(analysis_upgrade(ctx, analysis_station, array, action_station))
+    env.process(action_upgrade(ctx, action_station, array, analysis_station))
+
+    if config.ui:
+        env.process(UIClasses.save_graph(ctx, now))
+
+    env.run(until=config.end_time)
+
+    if config.ui:
         UIClasses.main.mainloop()
 
     local_simulation_collector = {
-        "data_age": data_age,
-        "data_age_by_type": data_age_by_type,
-        "successful_operations_total": successful_operations_total,
-        "number_of_sensors": number_of_sensors,
-        "agent_flow_rates_by_type": agent_flow_rates_by_type,
-        "total_resource": total_resource,
-        "self_organization_measure": self_organization_measure,
-        "successful_operations": successful_operations,
-        "last dt timesteps": timestep_list
+        "data_age": ctx.data_age,
+        "data_age_by_type": ctx.data_age_by_type,
+        "successful_operations_total": ctx.successful_operations_total,
+        "number_of_sensors": ctx.number_of_sensors,
+        "agent_flow_rates_by_type": ctx.agent_flow_rates_by_type,
+        "total_resource": ctx.total_resource,
+        "self_organization_measure": ctx.self_organization_measure,
+        "successful_operations": ctx.successful_operations,
+        "last dt timesteps": ctx.timestep_list
     }
 
     def print_to_file(local_simulation_collector):
@@ -486,7 +403,7 @@ def main_run(ui, print_excel, end_time, max_resource, dt, self_org_feedback_acti
             df.to_excel(excel_name, index=False)
 
 
-    if print_excel:
+    if config.print_excel:
         print_to_file(local_simulation_collector)
     return local_simulation_collector
 
