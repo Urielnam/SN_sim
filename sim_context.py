@@ -9,6 +9,9 @@ class SimulationContext:
         self.env = env
         self.config = config
 
+        # Strategy Hook
+        self.strategy = None
+
         # Event driven queues
         # Central Bus Input (PriorityStore for random access)
         self.bus_input_queue = simpy.PriorityStore(self.env)
@@ -45,14 +48,25 @@ class SimulationContext:
         self.successful_operations_total ={}
         self.total_resource = {}
 
+    def set_strategy(self, strategy_obj):
+        """Allows the strategy to register itself for priority callbacks."""
+        self.strategy = strategy_obj
+
     def send_to_bus(self, item):
         """
             Helper: Wraps an item with a random priority key and puts it
             onto the central bus queue.
             Returns the SimPy event (do not yield here, let the agent yield).
+            Priority is determined by the active Strategy (if any).
         """
-        random_priority = random.random()
-        sent_item = PriorityItem(priority=random_priority, item=item)
+        if self.strategy:
+            # Ask the strategy for priority (Lower number = Higher Priority)
+            priority_val = self.strategy.get_priority(item)
+        else:
+            # Default fallback (Random Access)
+            priority_val = random.random()
+
+        sent_item = PriorityItem(priority=priority_val, item=item)
         return self.bus_input_queue.put(sent_item)
 
     def get_all_packets(self):

@@ -1,12 +1,12 @@
 import simpy
 import random
-import pandas as pd
 from datetime import datetime
 
 from agents import IIoTNode, NetworkBus, EdgeProcessor, SCADAActuator
 from BackendClasses import clockanddatacalc_func, export_to_excel
 from sim_context import SimulationContext
 import UIClasses
+import strategies
 
 # -------------------------
 # SIMULATION
@@ -31,153 +31,6 @@ def main_run(config):
             if visualizer:
                 visualizer.tick()
 
-    def check_max_resource(ctx, bus, edge, scada):
-        return (len(ctx.iiot_list) + bus.flow_rate +
-                edge.flow_rate +
-                scada.flow_rate) < ctx.config.max_resource
-
-    def create_new_iiot(iiot_number, ctx):
-        # set a random number for the chances of giving good info.
-        # iiot accuracy = iiot_acc.
-        iiot_chance = config.iiot_acc*random.random()
-        # add new iiot
-        ctx.iiot_list.append(IIoTNode(ctx, iiot_chance, iiot_number))
-        # increase iiot count
-        return iiot_number + 1
-
-    def kill_iiot(ctx, iiot_name):
-        if not ctx.iiot_list:
-            return
-
-        target_node = None
-        if iiot_name:
-            # Find specific node to kill
-            for node in ctx.iiot_list:
-                if node.name == iiot_name:
-                    target_node = node
-                    break
-        else:
-            # Random kill
-            target_node = random.choice(ctx.iiot_registry)
-
-        if target_node:
-            target_node.is_alive = False
-            if target_node in ctx.iiot_list:
-                ctx.iiot_list.remove(target_node)
-
-
-
-    # we need to select how much we change the number of iiots, and then execute it.
-
-
-    def iiot_maker(ctx, bus, edge, scada):
-        """
-        Monitors feedback queue and adds/removes IIoT Nodes based on performance.
-        """
-
-        iiot_number = 2
-
-        while True:
-            # Wait for Feedback
-            feedback = yield ctx.bus_iiot_queue.get()
-
-            # Logic: Positive Feedback -> Grow
-            if feedback.status:
-                if check_max_resource(ctx, bus, edge, scada):
-                    iiot_number = create_new_iiot(iiot_number, ctx)
-
-            # Logic: Negative Feedback -> Prune Rogue Node
-            else:
-                kill_iiot(ctx, feedback.creator)
-                # If we killed the last one, restart population
-                if len(ctx.iiot_list) == 0:
-                    node_counter = create_new_iiot(iiot_number, ctx)
-
-            # if we are at max resource, reduce the number of iiots
-            if not check_max_resource(ctx, bus, edge, scada) and len(ctx.iiot_list) > 1:
-                selected_iiot = random.choice(ctx.iiot_list)
-                kill_iiot(ctx, selected_iiot)
-
-            if config.self_org_active:
-                """
-                main goal - if self-org is less than 10, have every agent type "vibrate".
-                check if condition is applied.
-                check if self_org is less than 10 (ampiric)
-                check if equal to last step.
-                try to increase (enough resources?)
-                if not enough resources
-                try to decrease (enough spare to decrease?)
-                if failed - do nothing.
-                """
-                if len(ctx.self_organization_measure) > 600:
-                    if list(ctx.self_organization_measure.values())[-1][0] < ctx.config.self_org_threshold:
-                        if len(ctx.iiot_list) == list(ctx.number_of_iiots.values())[-1][0]:
-                            if check_max_resource(ctx, bus, edge, scada):
-                                iiot_number = create_new_iiot(iiot_number, ctx.env)
-                            else:
-                                if len(ctx.iiot_list) > 1:
-                                    removed_iiot = random.choice(ctx.iiot_list.copy())
-                                    kill_iiot(ctx, removed_iiot)
-
-            yield ctx.env.timeout(0.01)
-
-    # same as previous logic, only with general object
-    # object could be bus network, edge processor station or scada upgrade
-    def increase_self_org(ctx, object, object_name):
-
-        if config.self_org_active:
-            if len(ctx.self_organization_measure) > 600:
-                if list(ctx.self_organization_measure.values())[-1][0] < ctx.config.self_org_threshold:
-                    if object.flow_rate == list(ctx.agent_flow_rates_by_type[object_name].values())[-1]:
-                        if check_max_resource(ctx, bus, edge, scada):
-                            object.flow_rate = object.flow_rate + 1
-                        else:
-                            if object.flow_rate > 1:
-                                object.flow_rate = object.flow_rate - 1
-
-    def bus_upgrade(ctx, bus, edge, scada):
-        while True:
-            yield ctx.env.timeout(0.1)
-            # Check length of PriorityStore items
-            q_len = len(ctx.bus_input_queue.items)
-
-            if q_len > bus.flow_rate * 5:
-                if check_max_resource(ctx, bus, edge, scada):
-                    bus.flow_rate += 1
-                elif q_len == 0 and bus.flow_rate > 1:
-                    bus.flow_rate -= 1
-
-            increase_self_org(ctx, bus, "Network Bus")
-
-
-    def edge_upgrade(ctx, edge, bus, scada):
-        while True:
-            yield ctx.env.timeout(0.1)
-            q_len = len(ctx.bus_edge_queue.items)
-
-            if q_len > edge.flow_rate * 5:
-                if check_max_resource(ctx, bus, edge, scada):
-                    edge.flow_rate += 1
-            elif q_len == 0 and edge.flow_rate > 1:
-                edge.flow_rate -= 1
-
-            increase_self_org(ctx, edge, "Edge Processor")
-            yield ctx.env.timeout(0.1)
-
-    def scada_upgrade(ctx, scada, bus, edge):
-        while True:
-            yield ctx.env.timeout(0.1)
-
-            q_len = len(ctx.bus_scada_queue.items)
-
-            if q_len > scada.flow_rate * 5:
-                if check_max_resource(ctx, bus, edge, scada):
-                    scada.flow_rate += 1
-            elif q_len == 0 and scada.flow_rate > 1:
-                scada.flow_rate -= 1
-
-
-            increase_self_org(ctx, scada, "SCADA Actuator")
 
     # 3. Setup Environment
     if config.ui:
@@ -201,15 +54,21 @@ def main_run(config):
     # Initial IIoT
     ctx.iiot_list.append(IIoTNode(ctx, 0.5, 1))
 
-   # 6. Start Processes
+    # 6. Initialize Optimization Strategy
+    if config.optimization_method == "biological":
+        strategy = strategies.BiologicalStrategy(ctx, bus, edge, scada)
+    else:
+        # Default fallback
+        strategy = strategies.BiologicalStrategy(ctx, bus, edge, scada)
+
+    # Execute Strategy Setup
+    strategy.setup()
+
+    # 7. Start Core Metrics
     env.process(metric_monitor(ctx, bus, edge, scada, vis))
-    env.process(iiot_maker(ctx, bus, edge, scada))
-    env.process(bus_upgrade(ctx, bus, edge, scada))
-    env.process(edge_upgrade(ctx, edge, bus, scada))
-    env.process(scada_upgrade(ctx, scada, bus, edge))
 
     # 7. Run Simulation
-    print(f"--- Starting Run (UI={config.ui}) ---")
+    print(f"--- Starting Run (Mode={config.optimization_method}, UI={config.ui}) ---")
 
     if config.ui:
         # If UI is on, we cannot use env.run(until=X) directly because

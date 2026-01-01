@@ -15,6 +15,9 @@ class SimulationConfig:
     self_org_active: bool = False
     self_org_threshold: float = 35
 
+    # Optimization Strategy Selector
+    optimization_method: str = "biological"
+
     data_type_keys = ["intel", "feedback", "target"]
 
     # Topology (Moved from Simulation.py global scope)
