@@ -23,11 +23,13 @@ RUN_PARAMS = {
     "max_resource": 100,
     "dt": 5,
     "iiot_acc": 0.6,
-    "self_org_active": False,
     "self_org_threshold": 35,
     "ui": False,
-    "print_excel": False
+    "print_excel": False,
+    "optimization_method": "ga"
 }
+
+# optimization methods include: "biological", "qos", "rl" and "ga"
 
 number_of_iterations = 1
 
@@ -57,10 +59,10 @@ if __name__ == '__main__':
         dt=RUN_PARAMS["dt"],
         max_resource=RUN_PARAMS["max_resource"],
         iiot_acc=RUN_PARAMS["iiot_acc"],
-        self_org_active=RUN_PARAMS["self_org_active"],
         self_org_threshold=RUN_PARAMS["self_org_threshold"],
         ui=RUN_PARAMS["ui"],
-        print_excel=RUN_PARAMS["print_excel"]
+        print_excel=RUN_PARAMS["print_excel"],
+        optimization_method=RUN_PARAMS["optimization_method"]
     )
 
     for i in range(number_of_iterations):

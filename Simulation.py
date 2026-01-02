@@ -57,6 +57,12 @@ def main_run(config):
     # 6. Initialize Optimization Strategy
     if config.optimization_method == "biological":
         strategy = strategies.BiologicalStrategy(ctx, bus, edge, scada)
+    elif config.optimization_method == "qos":
+        strategy = strategies.QoSStrategy(ctx, bus, edge, scada)
+    elif config.optimization_method == "rl":
+        strategy = strategies.RLStrategy(ctx, bus, edge, scada)
+    elif config.optimization_method == "ga":
+        strategy = strategies.GAStrategy(ctx, bus, edge, scada)
     else:
         # Default fallback
         strategy = strategies.BiologicalStrategy(ctx, bus, edge, scada)

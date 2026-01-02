@@ -12,7 +12,6 @@ class SimulationConfig:
 
     # Physics/Logic
     iiot_acc: float = 0.1
-    self_org_active: bool = False
     self_org_threshold: float = 35
 
     # Optimization Strategy Selector
