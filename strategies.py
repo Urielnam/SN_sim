@@ -202,7 +202,7 @@ class BiologicalStrategy(OptimizationStrategy):
             # Need enough history
             if len(self.ctx.self_organization_measure) > 10:
                 # Get latest measure
-                last_measure = list(self.ctx.self_organization_measure.values())[-1][0]
+                last_measure = list(self.ctx.self_organization_measure.values())[-1]
 
                 if last_measure < self.config.self_org_threshold:
                     # System is Stagnant -> Inject Entropy
@@ -316,7 +316,7 @@ class RLStrategy(OptimizationStrategy):
         """
         # Get total successes so far (safe access)
         if self.ctx.successful_operations_total:
-            current_total_success = list(self.ctx.successful_operations_total.values())[-1][0]
+            current_total_success = list(self.ctx.successful_operations_total.values())[-1]
         else:
             current_total_success = 0
 
@@ -428,7 +428,7 @@ class GAStrategy(OptimizationStrategy):
 
     def get_total_success(self):
         if self.ctx.successful_operations_total:
-            return list(self.ctx.successful_operations_total.values())[-1][0]
+            return list(self.ctx.successful_operations_total.values())[-1]
         return 0
 
     def get_current_cost(self):

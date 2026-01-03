@@ -1,5 +1,4 @@
 import simpy
-import random
 from datetime import datetime
 
 from agents import IIoTNode, NetworkBus, EdgeProcessor, SCADAActuator
@@ -12,11 +11,19 @@ import strategies
 # SIMULATION
 # -------------------------
 
-# export data at the end of runtime.
-# data to include
-# all plotted data - need to check how it's done maybe?
+def main_run(config, overrides=None):
+    """
+    Main simulation entry point.
+    Args:
+        config: SimulationConfig object.
+        overrides: Dictionary of parameters to override (for sensitivity analysis).
+    """
 
-def main_run(config):
+    # Apply overrides if provided (useful for sensitivity sweeps)
+    if overrides:
+        for k, v in overrides.items():
+            if hasattr(config, k):
+                setattr(config, k, v)
 
     now = datetime.now().ctime().replace(":", "_")
 
@@ -99,7 +106,12 @@ def main_run(config):
         env.run(until=config.end_time)
 
     # 8. Export Data
+
+    final_success = len(ctx.successful_operations)
+    final_resource = (len(ctx.iiot_list) + bus.flow_rate + edge.flow_rate + scada.flow_rate)
+
     local_simulation_collector = {
+        # Time Series Data
         "data_age": ctx.data_age,
         "data_age_by_type": ctx.data_age_by_type,
         "successful_operations_total": ctx.successful_operations_total,
@@ -107,8 +119,14 @@ def main_run(config):
         "agent_flow_rates_by_type": ctx.agent_flow_rates_by_type,
         "total_resource": ctx.total_resource,
         "self_organization_measure": ctx.self_organization_measure,
+
+        # Raw Data (For validation)
         "successful_operations": ctx.successful_operations,
-        "last dt timesteps": ctx.timestep_list
+        "last dt timesteps": ctx.timestep_list,
+
+        # Summary Metrics (For T-Test/ANOVA)
+        "final_success_count": final_success,
+        "final_resource_cost": final_resource
     }
 
     if config.print_excel:
