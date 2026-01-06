@@ -51,13 +51,25 @@ class ISRSimEnv(gym.Env):
         self.bus = NetworkBus(self.ctx)
         self.edge = EdgeProcessor(self.ctx)
         self.scada = SCADAActuator(self.ctx)
-        self.ctx.iiot_list.append(IIoTNode(self.ctx, 0.5, 1))
+
+        self.ctx.iiot_list.append(IIoTNode(self.ctx, 0.9, 1))
+
+        # Standard Flow Rates
+        self.bus.flow_rate = 1
+        self.edge.flow_rate = 1
+        self.scada.flow_rate = 1
 
         # Initialize Strategy (The RL Agent controls this)
         self.strategy = RLStrategy(self.ctx, self.bus, self.edge, self.scada)
 
+
         # Note: We do NOT call strategy.setup() or strategy.rl_step_loop() here.
         # The Gym 'step' function replaces the 'run' loop.
+
+        # Manually initialize the strategy state variables
+        # (Since we are skipping strategy.setup())
+        self.strategy.last_success_count = 0
+        self.strategy.last_time = 0
 
         # Start background physics (packet generation, transport)
         # We manually process events in the step() function
@@ -68,10 +80,10 @@ class ISRSimEnv(gym.Env):
         # 1. Apply Action
         self.strategy.apply_action(action)
 
-        # 2. Run Simulation for 1.0 second (Gym Step Duration)
-        # We need to run the SimPy environment forward by 1 tick
+        # 2. Run Simulation for 10.0 second (Gym Step Duration)
+        # This allows time for the action to actually bear fruit
         try:
-            self.env.run(until=self.env.now + 1.0)
+            self.env.run(until=self.env.now + 10.0)
         except simpy.core.EmptySchedule:
             pass  # End of sim
 

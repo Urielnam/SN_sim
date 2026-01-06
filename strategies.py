@@ -1,6 +1,15 @@
 from abc import ABC, abstractmethod
 import random
+import numpy as np
+import os
 
+# Try to import PPO for the RL Strategy
+try:
+    from stable_baselines3 import PPO
+    SB3_AVAILABLE = True
+except ImportError:
+    SB3_AVAILABLE = False
+    print("Warning: stable-baselines3 not found. RL Strategy will default to Random.")
 
 # Base Class
 class OptimizationStrategy(ABC):
@@ -254,50 +263,67 @@ class QoSStrategy(OptimizationStrategy):
 class RLStrategy(OptimizationStrategy):
     """
     RL Strategy:
-    - Disables background reactive heuristics.
-    - Implements a periodic 'Step' loop (1.0s interval).
-    - Defines State, Action, and Reward for an agent to learn.
-    - Currently uses a RANDOM AGENT as a placeholder to demonstrate the API.
+    - Loads a pre-trained PPO model from disk.
+    - Uses the model to predict actions based on system state.
+    - Falls back to Random if no model is found.
     """
 
     def setup(self):
-        # NOTE: We do NOT call super().setup() here.
-        # We want the RL agent to have full, exclusive control over the topology,
-        # rather than fighting against the hardcoded 'monitor_sensors' logic.
-
         # Initialize internal state tracker
         self.last_success_count = 0
         self.last_time = 0
+
+        # Load the "Brain"
+        self.model = None
+        model_path = "models/PPO/isr_final_model.zip"
+
+        if SB3_AVAILABLE and os.path.exists(model_path):
+            try:
+                self.model = PPO.load(model_path)
+                # print(f"RL Strategy: Loaded model from {model_path}")
+            except Exception as e:
+                print(f"RL Strategy: Failed to load model. Error: {e}")
+        else:
+            if not SB3_AVAILABLE:
+                print("RL Strategy: SB3 library missing.")
+            else:
+                print(f"RL Strategy: Model not found at {model_path}")
 
         # Start the RL Decision Loop
         self.env.process(self.rl_step_loop())
 
     def rl_step_loop(self):
         """
-        The 'Gym Step' equivalent.
-        Runs every 1.0 simulation seconds.
+        The 'Gym Step' equivalent running inside the simulation.
         """
         while True:
             # 1. Wait for next step (Simulates discrete time steps)
             yield self.env.timeout(1.0)
 
             # 2. Observe (Get State)
-            state = self.get_state()
+            state_list = self.get_state()
 
-            # 3. Calculate Reward (Utility of previous step)
-            reward = self.calculate_reward()
+            # SB3 expects a Numpy array
+            obs = np.array(state_list, dtype=np.float32)
 
-            # 4. Decide (Policy)
-            # TODO: Connect this to a real Neural Net / Q-Table.
-            # For now, we use a Random Agent to prove the Action API works.
-            action = random.choice(range(9))
+            # 3. Decide (Policy)
+            if self.model:
+                # Predict action using the trained brain
+                # deterministic=True means "Do the best thing you know", no exploration noise
+                action, _ = self.model.predict(obs, deterministic=True)
 
-            # 5. Act (Apply)
+                # SB3 actions are numpy arrays/scalars, convert to int
+                action = int(action)
+            else:
+                # Fallback to Random if training failed or model missing
+                action = random.choice(range(9))
+
+            # 4. Act (Apply)
             self.apply_action(action)
 
     def get_state(self):
         """
-        Returns a simplified state vector (could be normalized in a real env):
+        Returns a simplified state vector:
         [Bus_Q, Edge_Q, Scada_Q, Num_Sensors, Bus_Rate, Edge_Rate, Scada_Rate]
         """
         return [
@@ -330,8 +356,8 @@ class RLStrategy(OptimizationStrategy):
                              self.scada.flow_rate)
 
         # Reward Function
-        # We value 1 Success as worth 5 Resource units (Arbitrary Tuning)
-        reward = (new_successes * 5) - current_resources
+        # We value 1 Success as worth 50 Resource units (Arbitrary Tuning)
+        reward = (new_successes * 50) - current_resources
         return reward
 
     def apply_action(self, action_idx):
@@ -353,7 +379,8 @@ class RLStrategy(OptimizationStrategy):
         elif action_idx == 1:
             self.add_iiot()
         elif action_idx == 2:
-            self.remove_sensor()
+            if len(self.ctx.iiot_list)> 1:
+                self.remove_sensor()
         elif action_idx == 3:
             self.modify_flow_rate("bus", 1)
         elif action_idx == 4:
