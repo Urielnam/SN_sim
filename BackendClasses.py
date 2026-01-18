@@ -147,8 +147,6 @@ def calc_self_org_vectorized(ctx):
             The total self-organization measure.
     """
 
-    # need to find a way to limit the comparison (it runs too long...)
-
     changes_by_key = []
     timestep_limit = len(ctx.timestep_list)
 
@@ -171,7 +169,7 @@ def calc_self_org_vectorized(ctx):
 
     iiot_counts = np.array(list(ctx.number_of_iiots.values()))
     # limit the iiot count to the timestep limit
-    iiot_counts = iiot_counts[:timestep_limit]
+    iiot_counts = iiot_counts[-timestep_limit:]
     if len(iiot_counts) < 2:
         changes_by_key.append(0)
     else:
@@ -189,7 +187,12 @@ def clockanddatacalc_func(ctx, bus, edge, scada):
     prepare_timestep_list(ctx)
     calc_ages(ctx)
     calculate_number_of_objects(ctx, bus, edge, scada)
-    calc_self_org_over_time(ctx)
+    # 1. Calculate
+    # Use the vectorized/windowed version you implemented
+    current_volatility = calc_self_org_vectorized(ctx)
+
+    # 2. Log (Save) it to the dictionary
+    log_scalar(ctx.self_organization_measure, float(ctx.env.now), current_volatility)
     calc_success_over_time(ctx)
 
 

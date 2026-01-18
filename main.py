@@ -23,10 +23,10 @@ RUN_PARAMS = {
     "max_resource": 100,
     "dt": 5,
     "iiot_acc": 0.6,
-    "self_org_threshold": 35,
+    "self_org_threshold": 10000,
     "ui": False,
     "print_excel": False,
-    "optimization_method": "ga"
+    "optimization_method": "biological"
 }
 
 # optimization methods include: "biological", "qos", "rl" and "ga"

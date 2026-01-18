@@ -208,12 +208,14 @@ class BiologicalStrategy(OptimizationStrategy):
         while True:
             yield self.env.timeout(1.0)  # Check every 1s (less aggressive)
 
+
             # Need enough history
             if len(self.ctx.self_organization_measure) > 10:
                 # Get latest measure
                 last_measure = list(self.ctx.self_organization_measure.values())[-1]
 
                 if last_measure < self.config.self_org_threshold:
+
                     # System is Stagnant -> Inject Entropy
                     self._inject_entropy()
 

@@ -3,22 +3,25 @@ import multiprocessing
 import itertools
 from sim_config import SimulationConfig
 import Simulation
+import time
+from datetime import timedelta
 
 # --- CONFIGURATION FOR MEGA SWEEP ---
 
 SWEEP_CONFIG = {
 
     # 1. Physics Parameters
-    "dt": [1, 5, 10],  # Granularity of decision making
-    "iiot_acc": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],  # Sensor quality
-    "max_resource": [50, 100, 150, 500, 1000],  # Budget constraint
-    "self_org_threshold": [25, 35, 45, 100, 500, 1000],  # Volatility tolerance (Bio/GA only)
+    "dt": [1],  # Granularity of decision making
+    "iiot_acc": [0.1,0.3,0.5,0.7,0.9],  # Sensor quality
+    "max_resource": [100, 500,1000, 1500, 2000],  # Budget constraint
+    "self_org_threshold": [-1, 5],  # Volatility tolerance (Bio only)
 
     # 2. Strategies to Compare
+    # "optimization_method": ["biological", "qos", "ga"],
     "optimization_method": ["biological", "qos", "ga"],
 
     # 3. Statistical Rigor
-    "iterations_per_combo": 5  # Keep low (3-5) for mega sweeps, or it will run for days
+    "iterations_per_combo": 30  # Keep low (3-5) for mega sweeps, or it will run for days
 }
 
 
@@ -45,12 +48,21 @@ def run_single_worker(params):
         "self_org_threshold": thresh
     }
 
+    # --- START TIMER ---
+    start_time = time.time()
+
+
+
     # Run Simulation
     # We catch errors to prevent one crash from killing the whole sweep
     try:
         data = Simulation.main_run(config, overrides)
         success = data["final_success_count"]
         cost = data["final_resource_cost"]
+
+        # Calculate the average volatility (Self-Org Measure) over the run
+        self_org_values = list(data["self_organization_measure"].values())
+        max_self_org = max(self_org_values) if self_org_values else 0
 
         # Calculate Average Data Age (Latency)
         # We need to extract the individual floats.
@@ -65,6 +77,11 @@ def run_single_worker(params):
         print(f"Run Failed: {params} | Error: {e}")
         success = 0
         cost = 0
+        max_self_org = 0  # Default on fail
+
+    # --- END TIMER ---
+    end_time = time.time()
+    duration = end_time - start_time
 
     return {
         "Strategy": strat,
@@ -75,7 +92,9 @@ def run_single_worker(params):
         "Run_ID": run_id,
         "Final_Success": success,
         "Final_Cost": cost,
-        "Avg_Latency": round(avg_latency, 2)
+        "Avg_Latency": round(avg_latency, 2),
+        "Execution_Time_Sec": round(duration, 4),
+        "Avg_Self_Org": round(max_self_org, 2)
     }
 
 
@@ -90,7 +109,9 @@ if __name__ == "__main__":
     combinations = list(itertools.product(*values, range(SWEEP_CONFIG["iterations_per_combo"])))
 
     print(f"Total Simulations to Run: {len(combinations)}")
-    print(f"Estimated Time (at 1 sec/sim on 8 cores): {len(combinations) / 8 / 60:.2f} minutes")
+    total_seconds = 27.5 * len(combinations) / 8
+    time_delta = timedelta(seconds=int(total_seconds))
+    print(f"Estimated Time (at 27.5 sec/sim on 8 cores): {time_delta}")
 
     # Execute in Parallel
     with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
@@ -104,3 +125,4 @@ if __name__ == "__main__":
 
     print(f"\n--- Mega Sweep Complete. Saved to {filename} ---")
     print(df.groupby(["Strategy"]).mean(numeric_only=True)[["Final_Success", "Final_Cost"]])
+    print(f"Average Sim Time: {df['Execution_Time_Sec'].mean():.4f} seconds")

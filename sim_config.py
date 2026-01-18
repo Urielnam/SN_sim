@@ -9,6 +9,7 @@ class SimulationConfig:
     end_time: int = 1000
     dt: float = 5
     max_resource: int = 100
+    sampling_interval: float = 0.1
 
     # Physics/Logic
     iiot_acc: float = 0.1

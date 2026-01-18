@@ -129,9 +129,9 @@ def plot_all_success(simulation_collector):
     x = []
     y = []
     for run_num in simulation_collector:
+        resource_values = simulation_collector[run_num]["total_resource"].values()
+        x.append(sum(resource_values))
 
-        x.append((sum([item for sublist in list(simulation_collector[run_num]["total_resource"].values())
-                       for item in sublist])))
         y.append(len(simulation_collector[run_num]["successful_operations"]))
 
 

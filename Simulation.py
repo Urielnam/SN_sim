@@ -1,5 +1,6 @@
 import simpy
 from datetime import datetime
+import statistics
 
 from agents import IIoTNode, NetworkBus, EdgeProcessor, SCADAActuator
 from BackendClasses import clockanddatacalc_func, export_to_excel
@@ -29,7 +30,7 @@ def main_run(config, overrides=None):
 
     def metric_monitor(ctx, bus, edge, scada, visualizer=None):
         while True:
-            yield ctx.env.timeout(0.1)
+            yield ctx.env.timeout(ctx.config.sampling_interval)
 
             # Calculate Stats
             clockanddatacalc_func(ctx, bus, edge, scada)
@@ -108,7 +109,13 @@ def main_run(config, overrides=None):
     # 8. Export Data
 
     final_success = len(ctx.successful_operations)
-    final_resource = (len(ctx.iiot_list) + bus.flow_rate + edge.flow_rate + scada.flow_rate)
+    # Calculate Resource Usage over the entire run
+    if ctx.total_resource:
+        # Sum of all samples * duration of each sample = Total Resource-Time Units
+        final_resource = sum(ctx.total_resource.values()) * config.sampling_interval
+    else:
+        final_resource = 0
+
 
     local_simulation_collector = {
         # Time Series Data
