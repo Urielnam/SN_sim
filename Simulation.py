@@ -3,7 +3,7 @@ from datetime import datetime
 import statistics
 
 from agents import IIoTNode, NetworkBus, EdgeProcessor, SCADAActuator
-from BackendClasses import clockanddatacalc_func, export_to_excel
+from BackendClasses import clockanddatacalc_func, export_to_excel, snapshot_system_state
 from sim_context import SimulationContext
 import UIClasses
 import strategies
@@ -39,6 +39,10 @@ def main_run(config, overrides=None):
             if visualizer:
                 visualizer.tick()
 
+            # Capture integer state every 1.0 time unit (or config.dt)
+            if int(ctx.env.now * 10) % 10 == 0:
+                snapshot_system_state(ctx, bus, edge, scada)
+
 
     # 3. Setup Environment
     if config.ui:
@@ -71,6 +75,8 @@ def main_run(config, overrides=None):
         strategy = strategies.RLStrategy(ctx, bus, edge, scada)
     elif config.optimization_method == "ga":
         strategy = strategies.GAStrategy(ctx, bus, edge, scada)
+    elif config.optimization_method == "static":
+        strategy = strategies.StaticStrategy(ctx, bus, edge, scada)
     else:
         # Default fallback
         strategy = strategies.BiologicalStrategy(ctx, bus, edge, scada)
@@ -130,6 +136,9 @@ def main_run(config, overrides=None):
         # Raw Data (For validation)
         "successful_operations": ctx.successful_operations,
         "last dt timesteps": ctx.timestep_list,
+
+        # We must export the raw snapshots so the batch generator can save them
+        "state_snapshots": getattr(ctx, "state_snapshots", []),
 
         # Summary Metrics (For T-Test/ANOVA)
         "final_success_count": final_success,

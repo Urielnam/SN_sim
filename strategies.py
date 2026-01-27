@@ -465,3 +465,33 @@ class GAStrategy(OptimizationStrategy):
                 self.bus.flow_rate +
                 self.edge.flow_rate +
                 self.scada.flow_rate)
+
+
+# strategies.py (Append to end of file)
+
+class StaticStrategy(OptimizationStrategy):
+    """
+    Experiment Emergence: The Null Hypothesis.
+    Resources are fixed at initialization and never change.
+    This creates the baseline for 'Independence'.
+    """
+
+    def setup(self):
+        # We start the loops to keep the architecture consistent,
+        # but the methods themselves will be inert.
+        super().setup()
+
+    def monitor_sensors(self):
+        """Override: Do nothing. No sensors added/removed."""
+        while True:
+            yield self.env.timeout(float('inf'))  # Sleep forever
+
+    def monitor_component(self, name, agent, queue):
+        """Override: Do nothing. No flow rate changes."""
+        while True:
+            yield self.env.timeout(float('inf'))  # Sleep forever
+
+    def self_org_manager(self):
+        """Override: No biological vibration."""
+        while True:
+            yield self.env.timeout(float('inf'))

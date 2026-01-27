@@ -48,6 +48,9 @@ class SimulationContext:
         self.successful_operations_total ={}
         self.total_resource = {}
 
+        # Storage for emergence Calculations
+        self.state_snapshots = []  # List to store dicts: {'time': t, 'v1': val...}
+
     def set_strategy(self, strategy_obj):
         """Allows the strategy to register itself for priority callbacks."""
         self.strategy = strategy_obj

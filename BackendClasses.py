@@ -292,3 +292,34 @@ def calc_success_vs_self_org(self_organization_measure_dict, successful_operatio
             success_vs_self_org_dict[self_org_val]["values"].append(success_val)
 
     return success_vs_self_org_dict
+
+
+# BackendClasses.py
+
+def snapshot_system_state(ctx, bus, edge, scada, window_size=10):
+    """
+    Captures the instantaneous microstate vector at time t.
+    NO AVERAGING ALLOWED.
+    """
+    # 1. Calculate Instantaneous Success Rate (Count in last 'window' ticks)
+    # We filter the raw successful_operations list
+    current_time = ctx.env.now
+    recent_successes = [
+        t for t in ctx.successful_operations
+        if t > (current_time - window_size)
+    ]
+    success_count = len(recent_successes)
+
+    # 2. Construct the Vector
+    vector = {
+        "time": current_time,
+        "num_iiots": len(ctx.iiot_list),            # v1
+        "bus_flow": bus.flow_rate,                  # v2
+        "edge_flow": edge.flow_rate,                # v3
+        "scada_flow": scada.flow_rate,              # v4
+        "queue_len": len(ctx.bus_input_queue.items),# v5
+        "success_rate": success_count               # v6
+    }
+
+    # 3. Store
+    ctx.state_snapshots.append(vector)
