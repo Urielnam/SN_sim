@@ -14,6 +14,107 @@ def set_style():
     sns.set_context("paper", font_scale=1.4)
 
 
+def plot_heatmap_bio_vs_ga(df):
+    """
+    Fig 5: Biological vs GA.
+    Heatmap showing % Improvement of Bio over Genetic Algorithm.
+    """
+    # 1. Aggregate
+    means = df.groupby(["Strategy", "Max_Res", "Sensor_Acc"])["Final_Success"].mean().reset_index()
+
+    # 2. Pivot for easier math
+    # We expect columns: 'biological', 'ga'
+    pivoted = means.pivot(index=["Max_Res", "Sensor_Acc"], columns="Strategy", values="Final_Success").reset_index()
+
+    if 'biological' not in pivoted.columns or 'ga' not in pivoted.columns:
+        print("Skipping Bio vs GA Heatmap: Missing 'biological' or 'ga' data.")
+        return
+
+    # 3. Calculate Improvement
+    pivoted["Improvement"] = ((pivoted["biological"] - pivoted["ga"]) / pivoted["ga"]) * 100
+
+    # 4. Pivot for Heatmap
+    heatmap_data = pivoted.pivot(index="Sensor_Acc", columns="Max_Res", values="Improvement")
+
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(heatmap_data, annot=True, fmt=".1f", cmap="RdBu_r", center=0,
+                cbar_kws={'label': '% Improvement over GA'})
+
+    plt.title("Bio Gain over GA (%)")
+    plt.ylabel("Sensor Accuracy")
+    plt.xlabel("Resource Limit")
+
+    plt.tight_layout()
+    plt.savefig("paper_plots/fig5_bio_vs_ga.png", dpi=300)
+    print("Saved fig5_bio_vs_ga.png")
+
+
+def plot_heatmap_qos_vs_ga(df):
+    """
+    Fig 6: QoS vs GA.
+    Heatmap showing % Improvement of QoS over Genetic Algorithm.
+    """
+    means = df.groupby(["Strategy", "Max_Res", "Sensor_Acc"])["Final_Success"].mean().reset_index()
+    pivoted = means.pivot(index=["Max_Res", "Sensor_Acc"], columns="Strategy", values="Final_Success").reset_index()
+
+    # Check for 'ga' and 'qos' (case sensitive, assuming lowercase based on your snippet)
+    if 'qos' not in pivoted.columns or 'ga' not in pivoted.columns:
+        print("Skipping QoS vs GA Heatmap: Missing 'qos' or 'ga' data.")
+        return
+
+    # Improvement of QoS relative to GA
+    pivoted["Improvement"] = ((pivoted["qos"] - pivoted["ga"]) / pivoted["ga"]) * 100
+
+    heatmap_data = pivoted.pivot(index="Sensor_Acc", columns="Max_Res", values="Improvement")
+
+    plt.figure(figsize=(8, 6))
+    sns.heatmap(heatmap_data, annot=True, fmt=".1f", cmap="RdBu_r", center=0,
+                cbar_kws={'label': '% Improvement over GA'})
+
+    plt.title("QoS Gain over GA (%)")
+    plt.ylabel("Sensor Accuracy")
+    plt.xlabel("Resource Limit")
+
+    plt.tight_layout()
+    plt.savefig("paper_plots/fig6_qos_vs_ga.png", dpi=300)
+    print("Saved fig6_qos_vs_ga.png")
+
+
+def plot_heatmap_bio_vs_best(df):
+    """
+    Fig 7: Biological vs Best Baseline.
+    Heatmap showing % Improvement of Bio over the BEST of (GA, QoS).
+    This is the 'money plot' proving Bio beats the strongest alternative in every condition.
+    """
+    means = df.groupby(["Strategy", "Max_Res", "Sensor_Acc"])["Final_Success"].mean().reset_index()
+    pivoted = means.pivot(index=["Max_Res", "Sensor_Acc"], columns="Strategy", values="Final_Success").reset_index()
+
+    needed = ['biological', 'qos', 'ga']
+    if not all(col in pivoted.columns for col in needed):
+        print(f"Skipping Bio vs Best Heatmap: Data must contain all of {needed}")
+        return
+
+    # 1. Determine the best baseline for each condition (cell)
+    pivoted["Best_Baseline"] = pivoted[["qos", "ga"]].max(axis=1)
+
+    # 2. Calculate improvement over that best baseline
+    pivoted["Improvement"] = ((pivoted["biological"] - pivoted["Best_Baseline"]) / pivoted["Best_Baseline"]) * 100
+
+    # 3. Pivot for Heatmap
+    heatmap_data = pivoted.pivot(index="Sensor_Acc", columns="Max_Res", values="Improvement")
+
+    plt.figure(figsize=(8, 6))
+    # Using 'Greens' or 'RdYlGn' helps highlight positive gains clearly
+    sns.heatmap(heatmap_data, annot=True, fmt=".1f", cmap="RdYlGn", center=0, cbar_kws={'label': '% Improvement'})
+
+    plt.title("Bio Gain over Best Baseline (GA/QoS) (%)")
+    plt.ylabel("Sensor Accuracy")
+    plt.xlabel("Resource Limit")
+
+    plt.tight_layout()
+    plt.savefig("paper_plots/fig7_bio_vs_best.png", dpi=300)
+    print("Saved fig7_bio_vs_best.png")
+
 def plot_success_vs_resource(df):
     """
     Fig 1: The Main Result.
@@ -134,25 +235,33 @@ def main():
     if not os.path.exists("paper_plots"):
         os.makedirs("paper_plots")
 
-    # Check for the file (it might be named differently depending on your edit)
-    # If you renamed the file inside sensitivity_sweep, update it here.
+        # File loading logic
     file_to_open = INPUT_FILE
     if not os.path.exists(file_to_open) and os.path.exists("sensitivity_results.csv"):
         file_to_open = "sensitivity_results.csv"
 
     try:
         df = pd.read_csv(file_to_open)
+        # Ensure Strategy names are consistent (e.g., lowercase) to avoid KeyErrors
+        df['Strategy'] = df['Strategy'].str.lower()
         print(f"Loaded {len(df)} rows from {file_to_open}")
     except FileNotFoundError:
         print(f"Error: Could not find {INPUT_FILE} or sensitivity_results.csv.")
-        print("Please run sensitivity_sweep.py first.")
         return
 
     set_style()
+
+    # Original Plots
     plot_success_vs_resource(df)
     plot_efficiency_frontier(df)
-    plot_heatmap_bio_improvement(df)
+    plot_heatmap_bio_improvement(df)  # Bio vs QoS
     plot_latency_analysis(df)
+
+    # New Comparison Plots
+    print("Generating extended comparisons...")
+    plot_heatmap_bio_vs_ga(df)
+    plot_heatmap_qos_vs_ga(df)
+    plot_heatmap_bio_vs_best(df)
 
 
 if __name__ == "__main__":

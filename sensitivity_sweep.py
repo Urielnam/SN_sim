@@ -5,6 +5,7 @@ from sim_config import SimulationConfig
 import Simulation
 import time
 from datetime import timedelta
+import traceback
 
 # --- CONFIGURATION FOR MEGA SWEEP ---
 
@@ -14,7 +15,7 @@ SWEEP_CONFIG = {
     "dt": [1],  # Granularity of decision making
     "iiot_acc": [0.1,0.3,0.5,0.7,0.9],  # Sensor quality
     "max_resource": [100, 500,1000, 1500, 2000],  # Budget constraint
-    "self_org_threshold": [-1, 5],  # Volatility tolerance (Bio only)
+    "self_org_threshold": [5],  # Volatility tolerance (Bio only)
 
     # 2. Strategies to Compare
     # "optimization_method": ["biological", "qos", "ga"],
@@ -78,6 +79,7 @@ def run_single_worker(params):
         success = 0
         cost = 0
         max_self_org = 0  # Default on fail
+        avg_latency = 0
 
     # --- END TIMER ---
     end_time = time.time()
@@ -108,15 +110,29 @@ if __name__ == "__main__":
     # Add iteration count to the combinations
     combinations = list(itertools.product(*values, range(SWEEP_CONFIG["iterations_per_combo"])))
 
-    print(f"Total Simulations to Run: {len(combinations)}")
-    total_seconds = 27.5 * len(combinations) / 8
+    filtered_combinations = []
+    seen_non_bio = set()
+
+    for combo in combinations:
+        (dt, acc, res, thresh, strat, run_id) = combo
+
+        if strat == "biological":
+            filtered_combinations.append(combo)
+        else:
+            # For non-bio, only run if thresh is the first value in the list
+            # (Assuming the first value is the "default" for comparisons)
+            if thresh == SWEEP_CONFIG["self_org_threshold"][0]:
+                filtered_combinations.append(combo)
+
+    print(f"Total Simulations to Run: {len(filtered_combinations)}")
+    total_seconds = 27.5 * len(filtered_combinations) / 8
     time_delta = timedelta(seconds=int(total_seconds))
     print(f"Estimated Time (at 27.5 sec/sim on 8 cores): {time_delta}")
 
     # Execute in Parallel
     with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
         # Use imap_unordered for better progress tracking if you wanted to add tqdm later
-        results = pool.map(run_single_worker, combinations)
+        results = pool.map(run_single_worker, filtered_combinations)
 
     # Save
     df = pd.DataFrame(results)
