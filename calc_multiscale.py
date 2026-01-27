@@ -2,122 +2,194 @@ import pandas as pd
 import numpy as np
 import os
 import glob
-from scipy.stats import entropy
 import itertools
-import discretization_config as dc
+from scipy.stats import entropy
 
+# --- Configuration ---
 RAW_DATA_DIR = "sim_data/raw_batch"
-OUTPUT_FILE = "multiscale_data.csv"
+OUTPUT_FILE = "aggregated_multiscale_results.csv"
 
-# The 6 Variables (N=6)
-VARIABLES = ["num_iiots", "bus_flow", "edge_flow", "scada_flow", "queue_len", "success_rate"]
-N = len(VARIABLES)
+# The full list of potential variables
+ALL_VARIABLES = [
+    "num_iiots",
+    "bus_flow",
+    "edge_flow",
+    "scada_flow",
+    "queue_len",
+    "success_rate",
+    "avg_latency",
+    "feedback_state"
+]
 
 
-def calculate_shannon_entropy(series):
-    """H(X) in bits."""
-    if len(series) == 0: return 0
-    probs = series.value_counts(normalize=True, sort=False)
+def calculate_entropy_bits(df):
+    """
+    Calculates Shannon Entropy in bits for the unique rows in the dataframe.
+    H(X) = - sum(p * log2(p))
+    """
+    if df.empty:
+        return 0.0
+
+    # Count unique occurrences of joint states
+    # value_counts(normalize=True) gives probabilities directly
+    probs = df.value_counts(normalize=True, sort=False)
+
+    # Calculate entropy with base 2
     return entropy(probs, base=2)
 
 
-def get_subset_entropy(df, variables):
-    """Calculates H(S) for a specific subset of variables."""
-    if not variables: return 0
-    subset_df = df[variables].copy()
-    joint_state = subset_df.apply(tuple, axis=1)
-    return calculate_shannon_entropy(joint_state)
+def process_strategy(strategy_name, file_list):
+    print(f"\nProcessing Strategy: {strategy_name} ({len(file_list)} files)...")
 
+    # 1. Aggregate all runs into one Dataframe
+    df_list = []
+    for f in file_list:
+        try:
+            temp_df = pd.read_csv(f)
+            df_list.append(temp_df)
+        except Exception as e:
+            print(f"  [Warning] Could not read {f}: {e}")
 
-def analyze_run_recursive(file_path):
-    df = pd.read_csv(file_path)
+    if not df_list:
+        return []
 
-    # 1. Discretize
-    disc_df = pd.DataFrame()
-    capacity_bits = 0
+    full_df = pd.concat(df_list, ignore_index=True)
 
-    for col in VARIABLES:
-        if col in df.columns:
-            bins = dc.DISCRETE_BINS[col]
-            # Use 'labels=False' to get integers
-            disc_df[col] = pd.cut(df[col], bins=bins, labels=False, include_lowest=True)
-            capacity_bits += np.log2(dc.CAPACITIES[col])
-        else:
-            # If column missing, assume single state (0 entropy, 0 capacity contribution if not in config)
-            pass
+    # 2. Filter Variables (Remove constants to prevent "ghost redundancy")
+    # We only keep variables that have more than 1 unique value in the dataset.
+    active_vars = []
+    capacities = []
 
-    available_vars = [v for v in VARIABLES if v in disc_df.columns]
-    curr_N = len(available_vars)
+    for col in ALL_VARIABLES:
+        if col in full_df.columns:
+            # Get raw unique values (No binning!)
+            unique_vals = full_df[col].nunique()
 
-    # 2. Recursive Independence Subtraction
-    # V(0) = Theoretical Capacity
-    # V(k) = V(k-1) - Average_Independence(k)
+            if unique_vals > 1:
+                active_vars.append(col)
+                # Capacity = log2(Number of observed states)
+                # Note: If you want theoretical limits (e.g. max possible queue),
+                # hardcode them. Otherwise, this uses observed capacity.
+                capacities.append(np.log2(unique_vals))
+            else:
+                print(f"  - Excluding constant variable: {col} (Unique values: {unique_vals})")
 
+    N = len(active_vars)
+    total_capacity = sum(capacities)
+    print(f"  -> Active Variables (N={N}): {active_vars}")
+    print(f"  -> Total Capacity: {total_capacity:.4f} bits")
+
+    # If fewer than 2 variables vary, we cannot calculate multiscale interactions
+    if N < 2:
+        print("  [Skipping] Less than 2 active variables. No interaction possible.")
+        return []
+
+    # 3. Reduce DataFrame to only active columns to speed up entropy calc
+    data = full_df[active_vars]
+
+    # --- Multiscale Calculation (Step-by-Step according to formal method) ---
     v_curve = {}
-    v_current = capacity_bits
 
-    # Store V(0)
-    v_curve[0] = v_current
+    # Step 1: Initialization (Scale 1)
+    # V(1) = Total Joint Entropy H(X1, ..., XN)
+    v1 = calculate_entropy_bits(data)
+    v_curve[1] = v1
 
-    # H(Total) is constant for the dataset
-    h_total = get_subset_entropy(disc_df, available_vars)
+    # Step 2: Recursive Stripping (Intermediate Scales k=2 to N-1)
+    # V(k) = V(k-1) - D(k-1)
+    # D(k-1) = Sum over subsets S of size (k-1) of [H(X) - H(X \ S)]
 
-    for k in range(1, curr_N):
-        # Find all bipartitions of size k vs (N-k)
-        subsets = list(itertools.combinations(available_vars, k))
-        independences = []
+    current_v = v1
 
-        for subset in subsets:
-            S = list(subset)
-            S_bar = [x for x in available_vars if x not in S]
+    # Loop from scale k=2 up to N-1
+    # We stop before N because V(N) is calculated via the Sum Rule
+    for k in range(2, N):
+        subset_size = k - 1
 
-            h_s = get_subset_entropy(disc_df, S)
-            h_s_bar = get_subset_entropy(disc_df, S_bar)
+        # Generate all combinations of variables of size (k-1)
+        subsets = list(itertools.combinations(active_vars, subset_size))
 
-            # D = H(S) + H(S_bar) - H(Total)
-            # This measures how much info is lost by splitting the system here
-            d = h_s + h_s_bar - h_total
-            independences.append(d)
+        d_total_at_scale = 0
 
-        avg_independence = np.mean(independences)
+        for S in subsets:
+            # Identify the Complement (Rest of the system)
+            # Rest = X \ S
+            rest_vars = [v for v in active_vars if v not in S]
 
-        # Apply Subtraction
-        v_current = v_current - avg_independence
-        v_curve[k] = v_current
+            # H(Rest)
+            h_rest = calculate_entropy_bits(data[rest_vars])
 
-    # Final Step (k=N)
-    # Usually we define V(N) based on the trend or specific metric.
-    # Let's keep it consistent.
-    v_curve[curr_N] = v_current
+            # Independent Info Contribution = H(Total) - H(Rest)
+            # Logic: If I remove S, how much info do I lose?
+            info_gain = v1 - h_rest
+            d_total_at_scale += info_gain
 
-    strategy = os.path.basename(file_path).split('_')[1]
-    return strategy, v_curve, capacity_bits
+        # Update V(k)
+        next_v = current_v - d_total_at_scale
+        v_curve[k] = next_v
+        current_v = next_v
+
+    # Step 3: Global Correction (Scale N)
+    # Sum Rule: Sum(V(k)) must equal Total Capacity
+    # V(N) = Capacity - Sum(V(1)...V(N-1))
+
+    sum_prev_v = sum(v_curve.values())
+    v_curve[N] = total_capacity - sum_prev_v
+
+    # Format Results
+    results = []
+    is_emergent = v_curve[N] < 0  # Check criterion B (Negative tail)
+
+    # Also check criterion A (Oscillation)
+    # |V(k)| > Capacity for some k
+    has_oscillation = any(abs(val) > total_capacity for val in v_curve.values())
+
+    final_emergence_verdict = is_emergent or has_oscillation
+
+    for k in sorted(v_curve.keys()):
+        results.append({
+            "Strategy": strategy_name,
+            "Scale_k": k,
+            "Variety_Vk": v_curve[k],
+            "Capacity": total_capacity,
+            "Is_Emergent": final_emergence_verdict,
+            "Active_Variables": str(active_vars),
+            "N_Variables": N
+        })
+
+    return results
 
 
 def main():
-    print("--- Calculating Recursive Multiscale Variety V(k) ---")
+    # Find all CSV files
     all_files = glob.glob(os.path.join(RAW_DATA_DIR, "*.csv"))
 
-    rows = []
+    # Group files by strategy
+    # Assuming filename format like: "run_static_41.csv" -> strategy is "static"
+    files_by_strategy = {}
 
     for f in all_files:
-        try:
-            strat, profile, cap = analyze_run_recursive(f)
+        filename = os.path.basename(f)
+        parts = filename.split('_')
+        if len(parts) >= 2:
+            strategy = parts[1]  # "static", "biological", etc.
+            if strategy not in files_by_strategy:
+                files_by_strategy[strategy] = []
+            files_by_strategy[strategy].append(f)
 
-            for k, val in profile.items():
-                rows.append({
-                    "Strategy": strat,
-                    "Scale_k": k,
-                    "Variety_Vk": val,
-                    "Capacity": cap,
-                    "Run": os.path.basename(f)
-                })
-        except Exception as e:
-            print(f"Skipping {f}: {e}")
+    all_results = []
 
-    df = pd.DataFrame(rows)
-    df.to_csv(OUTPUT_FILE, index=False)
-    print(f"Done. Saved to {OUTPUT_FILE}")
+    for strategy, file_list in files_by_strategy.items():
+        results = process_strategy(strategy, file_list)
+        all_results.extend(results)
+
+    # Save to CSV
+    if all_results:
+        output_df = pd.DataFrame(all_results)
+        output_df.to_csv(OUTPUT_FILE, index=False)
+        print(f"\nCalculation complete. Aggregated results saved to {OUTPUT_FILE}")
+    else:
+        print("\nNo valid data found to process.")
 
 
 if __name__ == "__main__":

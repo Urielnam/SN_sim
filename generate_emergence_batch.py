@@ -4,15 +4,16 @@ import glob
 import multiprocessing
 import Simulation
 from sim_config import SimulationConfig
+import traceback
 
 # --- CONFIGURATION ---
 OUTPUT_DIR = "sim_data/raw_batch"
-STRATEGIES = ["static", "qos", "biological"]
+STRATEGIES = ["static", "qos", "biological", "ga"]
 
 # --- APPEND MODE SETTINGS ---
 # This is "X": The number of NEW files to generate per strategy.
 # If you have 5 files and set this to 50, you will end up with 55 files.
-RUNS_TO_ADD = 1
+RUNS_TO_ADD = 99
 
 # SIMULATION SETTINGS
 SIM_DURATION = 1000
@@ -92,6 +93,7 @@ def run_single_batch_worker(params):
         return f"Saved: {run_id} ({len(df)} rows)"
 
     except Exception as e:
+        traceback.print_exc()
         return f"[ERROR] {run_id} Failed: {e}"
 
 

@@ -310,7 +310,21 @@ def snapshot_system_state(ctx, bus, edge, scada, window_size=10):
     ]
     success_count = len(recent_successes)
 
-    # 2. Construct the Vector
+    # 2. Calculate Average Latency (in the last window_size)
+    # We filter the tuple list: (timestamp, latency)
+    # Get the list of lists for this specific tick (cast time to float to match keys)
+    current_ages_nested = ctx.data_age.get(float(current_time), [])
+
+    # Flatten the list (handle cases where multiple lists exist for one tick)
+    flat_ages = [val for sublist in current_ages_nested for val in sublist]
+
+    if flat_ages:
+        raw_avg = sum(flat_ages) / len(flat_ages)
+        avg_data_age = int(round(raw_avg))
+    else:
+        avg_data_age = 0
+
+    # 3. Construct the Vector
     vector = {
         "time": current_time,
         "num_iiots": len(ctx.iiot_list),            # v1
@@ -318,7 +332,9 @@ def snapshot_system_state(ctx, bus, edge, scada, window_size=10):
         "edge_flow": edge.flow_rate,                # v3
         "scada_flow": scada.flow_rate,              # v4
         "queue_len": len(ctx.bus_input_queue.items),# v5
-        "success_rate": success_count               # v6
+        "success_rate": success_count,              # v6
+        "avg_latency": avg_data_age,
+        "feedback_state": scada.current_feedback
     }
 
     # 3. Store

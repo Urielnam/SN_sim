@@ -8,6 +8,8 @@ class SCADAActuator(object):
         self.action = self.env.process(self.run())
         self.flow_rate = 1
 
+        self.current_feedback = 0
+
     def run(self):
         while True:
             # 1. WAIT
@@ -33,6 +35,8 @@ class SCADAActuator(object):
             if is_success:
                 # Log success for statistics
                 self.ctx.successful_operations.append(self.env.now)
+
+            self.current_feedback = 1 if is_success else 0
 
             # Create the feedback packet
             feedback_packet = DataPacket(
