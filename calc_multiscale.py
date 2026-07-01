@@ -65,7 +65,18 @@ def process_strategy(strategy_name, file_list):
             # Get raw unique values (No binning!)
             unique_vals = full_df[col].nunique()
 
+            # Rule 1: Must actually vary
             if unique_vals > 1:
+                # Rule 2: Global Exclusion (Edge Flow is clone of Bus Flow)
+                if col == 'edge_flow':
+                    print(f"  - Excluding correlated variable: {col} (Global)")
+                    continue
+
+                # Rule 3: Static Exclusion (Latency is clone of Queue in Static only)
+                if strategy_name == 'static' and col == 'avg_latency':
+                    print(f"  - Excluding correlated variable: {col} (Static Rule)")
+                    continue
+
                 active_vars.append(col)
                 # Capacity = log2(Number of observed states)
                 # Note: If you want theoretical limits (e.g. max possible queue),

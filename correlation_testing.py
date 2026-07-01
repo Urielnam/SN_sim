@@ -3,82 +3,121 @@ import numpy as np
 import glob
 import os
 import matplotlib.pyplot as plt
-from scipy.stats import pearsonr
+import seaborn as sns
 
-# Configuration
+# --- Configuration ---
 RAW_DATA_DIR = "sim_data/raw_batch"
-OUTPUT_IMG = "correlation_analysis.png"
+OUTPUT_IMG = "correlation_heatmaps_all.png"
+
+# The variables to test
+VARIABLES = [
+    "num_iiots", "bus_flow", "edge_flow", "scada_flow",
+    "queue_len", "success_rate", "avg_latency", "feedback_state"
+]
 
 
-def analyze_correlations():
-    # 1. Load Data
+def plot_correlation_matrices():
+    # 1. Load and Group Data
     all_files = glob.glob(os.path.join(RAW_DATA_DIR, "*.csv"))
-    data_map = {}  # { 'static': DataFrame, 'biological': DataFrame ... }
+    data_map = {}
 
-    print(f"Found {len(all_files)} files.")
+    print(f"Found {len(all_files)} files. Loading data...")
 
     for f in all_files:
         try:
-            # Extract strategy name from filename (e.g., run_static_41.csv -> static)
-            strategy = os.path.basename(f).split('_')[1]
+            # Infer strategy from filename (e.g. run_biological_X.csv)
+            parts = os.path.basename(f).split('_')
+            if len(parts) < 2: continue
+            strategy = parts[1]
 
             df = pd.read_csv(f)
 
-            # Select only relevant columns
-            if 'queue_len' in df.columns and 'avg_latency' in df.columns:
-                subset = df[['queue_len', 'avg_latency']].copy()
+            # Keep only existing columns from our target list
+            cols_to_use = [c for c in VARIABLES if c in df.columns]
+            if not cols_to_use: continue
 
-                # Append to the strategy's massive dataframe
-                if strategy not in data_map:
-                    data_map[strategy] = subset
-                else:
-                    data_map[strategy] = pd.concat([data_map[strategy], subset], ignore_index=True)
+            subset = df[cols_to_use]
+
+            if strategy not in data_map:
+                data_map[strategy] = subset
+            else:
+                data_map[strategy] = pd.concat([data_map[strategy], subset], ignore_index=True)
+
         except Exception as e:
             print(f"Skipping {f}: {e}")
 
-    # 2. Calculate & Plot
-    strategies = sorted(data_map.keys())
-    fig, axes = plt.subplots(1, len(strategies), figsize=(5 * len(strategies), 5), sharey=True)
+    # 2. Create "Combined" Dataset
+    if not data_map:
+        print("No valid data found.")
+        return
 
-    # Handle case of single strategy (axes is not a list)
-    if len(strategies) == 1: axes = [axes]
+    combined_df = pd.concat(data_map.values(), ignore_index=True)
+    data_map['Combined'] = combined_df
 
-    print("\n--- Correlation Results ---")
+    # Sort strategies but keep 'Combined' at the end/beginning
+    strategies = sorted([k for k in data_map.keys() if k != 'Combined'])
+    plot_order = strategies + ['Combined']
 
-    for i, strat in enumerate(strategies):
+    n_plots = len(plot_order)
+
+    # 3. Setup Plot
+    # Adjust width based on number of plots
+    fig, axes = plt.subplots(1, n_plots, figsize=(5.5 * n_plots, 6), constrained_layout=True)
+
+    if n_plots == 1: axes = [axes]
+
+    print("\n--- Correlation Highlights ---")
+
+    for i, strat in enumerate(plot_order):
         df = data_map[strat]
         ax = axes[i]
 
-        # Drop NaNs or infinite values
-        df = df.replace([np.inf, -np.inf], np.nan).dropna()
+        # Calculate Matrix
+        # dropna(how='all') removes constant columns (std=0) which return NaN correlation
+        corr_matrix = df.corr(method='pearson')
+        corr_matrix = corr_matrix.dropna(axis=0, how='all').dropna(axis=1, how='all')
 
-        # Add slight jitter to seeing overlapping points (optional)
-        jitter_x = df['queue_len'] + np.random.normal(0, 0.1, size=len(df))
-        jitter_y = df['avg_latency'] + np.random.normal(0, 0.1, size=len(df))
+        # Highlight "Combined" with a different color map or title color
+        is_combined = (strat == 'Combined')
+        title_color = 'darkred' if is_combined else 'black'
+        cmap = "RdBu_r" if is_combined else "coolwarm"
 
-        # Scatter Plot
-        ax.scatter(jitter_x, jitter_y, alpha=0.1, s=10, c='blue')
+        # Plot Heatmap
+        sns.heatmap(
+            corr_matrix,
+            annot=True,
+            fmt=".2f",
+            cmap=cmap,
+            vmin=-1, vmax=1,
+            center=0,
+            square=True,
+            cbar=False,  # We will add a single shared colorbar if needed, or just individual ones
+            ax=ax,
+            annot_kws={"size": 9}
+        )
 
-        # Calculate Pearson Correlation
-        if len(df) > 2 and df['avg_latency'].std() > 0:
-            corr, _ = pearsonr(df['queue_len'], df['avg_latency'])
+        ax.set_title(f"{strat.upper()}", fontsize=14, fontweight='bold', color=title_color)
+        ax.tick_params(axis='x', rotation=45, labelsize=9)
+        ax.tick_params(axis='y', rotation=0, labelsize=9)
+
+        # Print Strong Links
+        print(f"\n[{strat.upper()}] Strongest Links (>0.9):")
+        upper = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
+        strong_links = upper.unstack().dropna()
+        strong_links = strong_links[abs(strong_links) > 0.9]
+
+        if not strong_links.empty:
+            for idx, val in strong_links.items():
+                print(f"  - {idx[0]} <-> {idx[1]}: {val:.4f}")
         else:
-            corr = 0.0  # Constant values have 0 correlation by definition
+            print("  (None found)")
 
-        title = f"{strat.upper()}\nCorr: {corr:.4f}"
-        print(f"{strat}: Pearson r = {corr:.4f}")
-
-        # Aesthetics
-        ax.set_title(title, fontsize=12, fontweight='bold')
-        ax.set_xlabel("Queue Length")
-        if i == 0: ax.set_ylabel("Avg Latency")
-        ax.grid(True, alpha=0.3)
-
-    plt.tight_layout()
-    plt.savefig(OUTPUT_IMG)
-    print(f"\nPlot saved to {OUTPUT_IMG}")
-    plt.show()
+    # 4. Save (No plt.show)
+    print(f"\nSaving plot to {OUTPUT_IMG}...")
+    plt.savefig(OUTPUT_IMG, dpi=150)
+    plt.close()  # Close memory
+    print("Done.")
 
 
 if __name__ == "__main__":
-    analyze_correlations()
+    plot_correlation_matrices()
