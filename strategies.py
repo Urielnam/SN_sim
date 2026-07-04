@@ -11,6 +11,16 @@ except ImportError:
     SB3_AVAILABLE = False
     print("Warning: stable-baselines3 not found. RL Strategy will default to Random.")
 
+def calculate_qos_priority(packet):
+    """Standalone helper to calculate QoS priority to prevent code duplication."""
+    jitter = random.random()
+    if packet.type == 'target':
+        return 1.0 + jitter
+    elif packet.type == 'feedback':
+        return 2.0 + jitter
+    else:
+        return 3.0 + jitter
+
 # Base Class
 class OptimizationStrategy(ABC):
     def __init__(self, ctx, bus, edge, scada):
@@ -250,13 +260,7 @@ class QoSStrategy(OptimizationStrategy):
 
     def get_priority(self, packet):
         # High Priority for Critical Actions, Low for Raw Data
-        jitter = random.random()
-        if packet.type == 'target':
-            return 1.0 + jitter
-        elif packet.type == 'feedback':
-            return 2.0 + jitter
-        else:
-            return 3.0 + jitter
+        return calculate_qos_priority(packet)
 
 
 # -----------------------------------------------------------
@@ -466,8 +470,9 @@ class GAStrategy(OptimizationStrategy):
                 self.edge.flow_rate +
                 self.scada.flow_rate)
 
-
-# strategies.py (Append to end of file)
+# -----------------------------------------------------------
+# STRATEGY 0: Resources Never Change (Online Hill-Climber)
+# -----------------------------------------------------------
 
 class StaticStrategy(OptimizationStrategy):
     """
@@ -495,3 +500,28 @@ class StaticStrategy(OptimizationStrategy):
         """Override: No biological vibration."""
         while True:
             yield self.env.timeout(float('inf'))
+
+
+# -----------------------------------------------------------
+# STRATEGY 5: FUNDAMENTAL ONLY
+# -----------------------------------------------------------
+class FundamentalStrategy(OptimizationStrategy):
+    """
+    Pure fundamental reactive loops.
+    Only grows/shrinks based on queues and feedback. No vibration, no QoS.
+    """
+    def setup(self):
+        # Starts the base monitor_sensors and monitor_component loops only
+        super().setup()
+
+# -----------------------------------------------------------
+# STRATEGY 6: QoS + BIOLOGICAL
+# -----------------------------------------------------------
+class QoSBioStrategy(BiologicalStrategy):
+    """
+    Combines Biological vibration (from BiologicalStrategy) with
+    traffic prioritization (from QoSStrategy).
+    """
+    def get_priority(self, packet):
+        # High Priority for Critical Actions, Low for Raw Data
+        return calculate_qos_priority(packet)

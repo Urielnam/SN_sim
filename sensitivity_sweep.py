@@ -14,12 +14,13 @@ SWEEP_CONFIG = {
     # 1. Physics Parameters
     "dt": [1],  # Granularity of decision making
     "iiot_acc": [0.1,0.3,0.5,0.7,0.9],  # Sensor quality
-    "max_resource": [100, 500,1000, 1500, 2000],  # Budget constraint
+    # 100, 500,1000,1500,
+    "max_resource": [2000],  # Budget constraint
     "self_org_threshold": [5],  # Volatility tolerance (Bio only)
 
     # 2. Strategies to Compare
-    # "optimization_method": ["biological", "qos", "ga"],
-    "optimization_method": ["biological", "qos", "ga"],
+    # "optimization_method": ["biological", "qos", "ga","fundamental", "qos_bio"],
+    "optimization_method": ["qos_bio"],
 
     # 3. Statistical Rigor
     "iterations_per_combo": 30  # Keep low (3-5) for mega sweeps, or it will run for days
@@ -116,7 +117,7 @@ if __name__ == "__main__":
     for combo in combinations:
         (dt, acc, res, thresh, strat, run_id) = combo
 
-        if strat == "biological":
+        if strat in ["biological","qos_bio"]:
             filtered_combinations.append(combo)
         else:
             # For non-bio, only run if thresh is the first value in the list
@@ -125,9 +126,10 @@ if __name__ == "__main__":
                 filtered_combinations.append(combo)
 
     print(f"Total Simulations to Run: {len(filtered_combinations)}")
-    total_seconds = 27.5 * len(filtered_combinations) / 8
+    per_sim = 14.5
+    total_seconds = per_sim * len(filtered_combinations) / 8
     time_delta = timedelta(seconds=int(total_seconds))
-    print(f"Estimated Time (at 27.5 sec/sim on 8 cores): {time_delta}")
+    print(f"Estimated Time (at {per_sim} sec/sim on 8 cores): {time_delta}")
 
     # Execute in Parallel
     with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:

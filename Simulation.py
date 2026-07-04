@@ -77,6 +77,10 @@ def main_run(config, overrides=None):
         strategy = strategies.GAStrategy(ctx, bus, edge, scada)
     elif config.optimization_method == "static":
         strategy = strategies.StaticStrategy(ctx, bus, edge, scada)
+    elif config.optimization_method == "fundamental":
+        strategy = strategies.FundamentalStrategy(ctx, bus, edge, scada)
+    elif config.optimization_method == "qos_bio":
+        strategy = strategies.QoSBioStrategy(ctx, bus, edge, scada)
     else:
         # Default fallback
         strategy = strategies.BiologicalStrategy(ctx, bus, edge, scada)

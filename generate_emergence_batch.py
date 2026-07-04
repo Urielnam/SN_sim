@@ -8,7 +8,8 @@ import traceback
 
 # --- CONFIGURATION ---
 OUTPUT_DIR = "sim_data/raw_batch"
-STRATEGIES = ["static", "qos", "biological", "ga"]
+#["static", "qos", "biological", "ga","fundamental", "qos_bio"]
+STRATEGIES = ["fundamental", "qos_bio"]
 
 # --- APPEND MODE SETTINGS ---
 # This is "X": The number of NEW files to generate per strategy.
