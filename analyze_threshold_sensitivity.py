@@ -6,7 +6,7 @@ import sys
 import numpy as np
 
 # Configuration
-INPUT_FILE = "mega_sweep_results.csv"
+INPUT_FILE =  sys.argv[1] if len(sys.argv) > 1 else "mega_sweep_results.csv"
 BASE_OUTPUT_DIR = "paper_plots/threshold_analysis"
 
 

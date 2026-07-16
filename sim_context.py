@@ -1,7 +1,7 @@
 import random
 
 import simpy
-from simpy import PriorityItem
+from simpy.resources.store import PriorityItem
 
 # sim_context.py
 class SimulationContext:

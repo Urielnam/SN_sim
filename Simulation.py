@@ -5,7 +5,7 @@ import statistics
 from agents import IIoTNode, NetworkBus, EdgeProcessor, SCADAActuator
 from BackendClasses import clockanddatacalc_func, export_to_excel, snapshot_system_state
 from sim_context import SimulationContext
-import UIClasses
+
 import strategies
 
 # -------------------------
@@ -39,10 +39,12 @@ def main_run(config, overrides=None):
             if visualizer:
                 visualizer.tick()
 
-            # Capture integer state every 1.0 time unit (or config.dt)
-            if int(ctx.env.now * 10) % 10 == 0:
-                snapshot_system_state(ctx, bus, edge, scada)
+            # OLD - Capture integer state every 1.0 time unit (or config.dt)
+            # if int(ctx.env.now * 10) % 10 == 0:
+            #    snapshot_system_state(ctx, bus, edge, scada)
 
+            # Capture state continuously at every sampling interval
+            snapshot_system_state(ctx, bus, edge, scada)
 
     # 3. Setup Environment
     if config.ui:
@@ -56,6 +58,7 @@ def main_run(config, overrides=None):
     # 4. Instantiate Visualizer (If UI is True)
     vis = None
     if config.ui:
+        import UIClasses
         vis = UIClasses.Visualizer(ctx)
 
     # 5.Instantiate Agents
@@ -67,24 +70,48 @@ def main_run(config, overrides=None):
     ctx.iiot_list.append(IIoTNode(ctx, 0.5, 1))
 
     # 6. Initialize Optimization Strategy
-    if config.optimization_method == "biological":
-        strategy = strategies.BiologicalStrategy(ctx, bus, edge, scada)
-    elif config.optimization_method == "qos":
-        strategy = strategies.QoSStrategy(ctx, bus, edge, scada)
-    elif config.optimization_method == "rl":
-        strategy = strategies.RLStrategy(ctx, bus, edge, scada)
-    elif config.optimization_method == "ga":
-        strategy = strategies.GAStrategy(ctx, bus, edge, scada)
-    elif config.optimization_method == "static":
-        strategy = strategies.StaticStrategy(ctx, bus, edge, scada)
-    elif config.optimization_method == "fundamental":
-        strategy = strategies.FundamentalStrategy(ctx, bus, edge, scada)
-    elif config.optimization_method == "qos_bio":
-        strategy = strategies.QoSBioStrategy(ctx, bus, edge, scada)
-    else:
-        # Default fallback
-        strategy = strategies.BiologicalStrategy(ctx, bus, edge, scada)
+    # Map the config string to the strategy classes
+    strategy_mapping = {
+        # Baseline
+        "static": strategies.StaticStrategy,
 
+        # Fundamental
+        "pure_fundamental": strategies.PureFundamentalStrategy,
+
+        # Biological
+        "pure_biological": strategies.PureBiologicalStrategy,
+
+        # Bio + Fund
+        "biological": strategies.BiologicalStrategy,
+
+        # QoS
+        "pure_qos": strategies.PureQoSStrategy,
+
+        # QoS + Fund
+        "qos": strategies.QoSStrategy,
+
+        # QoS + Bio
+        "pure_qos_bio": strategies.PureQoSBioStrategy,
+
+        # QoS + Fund + Biological
+        "qos_bio": strategies.QoSBioStrategy,
+
+        # GA
+        "pure_ga": strategies.PureGAStrategy,
+
+        # GA + Fund
+        "ga": strategies.GAStrategy,
+
+        # RL
+        "rl": strategies.RLStrategy
+    }
+
+    strategy_class = strategy_mapping.get(
+        config.optimization_method,
+        strategies.StaticStrategy
+    )
+
+    strategy = strategy_class(ctx, bus, edge, scada)
     # Execute Strategy Setup
     strategy.setup()
 

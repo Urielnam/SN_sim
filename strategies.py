@@ -21,8 +21,14 @@ def calculate_qos_priority(packet):
     else:
         return 3.0 + jitter
 
-# Base Class
-class OptimizationStrategy(ABC):
+# ==========================================
+# 1. THE CORE BASE (The 'Static' Blueprint)
+# ==========================================
+class BaseStrategy(ABC):
+    """
+    The Base Strategy defines the fundamental actions (API) and telemetry getters.
+    By itself, it is completely inert (Static Strategy).
+    """
     def __init__(self, ctx, bus, edge, scada):
         self.ctx = ctx
         self.env = ctx.env
@@ -41,110 +47,43 @@ class OptimizationStrategy(ABC):
         # Register self with context for priority callbacks
         self.ctx.set_strategy(self)
 
-    @abstractmethod
     def setup(self):
-        """
-        Default Setup: Starts the fundamental reactive loops.
-        Override this to add extra processes (like Vibration) or
-        to disable growth (for a pure Static mode).
-        """
-
-        self.env.process(self.monitor_sensors())
-        self.env.process(self.monitor_component("bus", self.bus, self.ctx.bus_input_queue))
-        self.env.process(self.monitor_component("edge", self.edge, self.ctx.bus_edge_queue))
-        self.env.process(self.monitor_component("scada", self.scada, self.ctx.bus_scada_queue))
+        """Base setup does nothing. This creates the pure Static state."""
+        pass
 
     def get_priority(self, packet):
-        """
-        Determines the priority of a packet.
-        Default behavior: Random (Simulates standard Ethernet collision/contention).
-        Override this for QoS strategies.
-        """
+        """Default behavior: Random (Simulates standard Ethernet collision/contention)."""
         return random.random()
 
-        # --- FUNDAMENTAL GROWTH LOOPS (Reactive Logic) ---
+    # --- UNIFIED TELEMETRY (DRY) ---
+    def get_current_cost(self):
+        """Unified tracking of active resources across all mixins."""
+        return (len(self.ctx.iiot_list) +
+                self.bus.flow_rate +
+                self.edge.flow_rate +
+                self.scada.flow_rate)
 
-    def monitor_sensors(self):
-        """
-        Fundamental: Consumes Feedback to grow/shrink Sensor population.
-        """
-        while True:
-            # 1. Wait for Feedback (Blocking)
-            feedback = yield self.ctx.bus_iiot_queue.get()
-
-            # 2. React to Feedback
-            if feedback.status:
-                # Success -> Survival/Growth
-                self.add_iiot()
-            else:
-                # Failure -> Pruning
-                # If specific creator is known, kill them.
-                self.remove_sensor(feedback.creator)
-
-                # Prevent total extinction (System Resilience)
-                if len(self.ctx.iiot_list) == 0:
-                    self.add_iiot()
-
-            # 3. Global Constraint Check (Optional random pruning if over capacity)
-            # This mimics resource shedding under load
-            if not self._check_max_resource() and len(self.ctx.iiot_list) > 1:
-                self.remove_sensor()
-
-            # Yield briefly to let other processes run
-            yield self.env.timeout(0.01)
-
-    def monitor_component(self, name, agent, queue):
-        """
-        Fundamental: Monitors Queue length to adjust Bandwidth (Flow Rate).
-        """
-        # Track the last time we reduced resources for this specific component
-        last_downgrade_time = -self.cooldown_ticks
-
-        while True:
-            yield self.env.timeout(0.1)
-            q_len = len(queue.items)
-
-            # 1. Scale Up Logic (Aggressive)
-            # If queue exceeds the evolved threshold, upgrade immediately.
-            if q_len > agent.flow_rate * self.threshold_mult:
-                self.modify_flow_rate(name, 1)
-
-            # 2. Scale Down Logic (Conservative / Hysteresis)
-            # Only downgrade if queue is empty AND we haven't downgraded recently.
-            elif q_len == 0:
-                # Check if enough time has passed since the last downgrade
-                if (self.env.now - last_downgrade_time) >= self.cooldown_ticks:
-                    if self.modify_flow_rate(name, -1):
-                        last_downgrade_time = self.env.now
-
-    # --- UNIFIED API ---
+    def get_total_success(self):
+        """Unified tracking of accumulated success across all mixins."""
+        if self.ctx.successful_operations_total:
+            return list(self.ctx.successful_operations_total.values())[-1]
+        return 0
 
     def _check_max_resource(self):
-        current_usage = (len(self.ctx.iiot_list) +
-                         self.bus.flow_rate +
-                         self.edge.flow_rate +
-                         self.scada.flow_rate)
-        return current_usage < self.config.max_resource
+        return self.get_current_cost() < self.config.max_resource
 
+    # --- UNIFIED ACTION API ---
     def add_iiot(self):
-        """Action: Try to spawn a new IIoT Node."""
         if not self._check_max_resource():
-            return False # Action Failed: Resource Cap
-
+            return False
         from agents import IIoTNode
-
-        # Logic: Assign ID based on count
         next_id = len(self.ctx.iiot_list) + 1
-
-        # Logic: Inherit accuracy from config
         iiot_chance = self.config.iiot_acc * random.random()
-
         new_node = IIoTNode(self.ctx, iiot_chance, next_id)
         self.ctx.iiot_list.append(new_node)
         return True
 
     def remove_sensor(self, specific_node_name=None):
-        """Action: Remove a sensor (pruning)."""
         if not self.ctx.iiot_list:
             return False
 
@@ -155,7 +94,6 @@ class OptimizationStrategy(ABC):
                     target_node = node
                     break
         else:
-            # Random removal (strandard for resource shedding)
             target_node = random.choice(self.ctx.iiot_list)
 
         if target_node:
@@ -166,9 +104,6 @@ class OptimizationStrategy(ABC):
         return False
 
     def modify_flow_rate(self, component_name, delta):
-        """Action: Increase/Decrease bandwidth of a component."""
-
-        # Map name to object
         target_obj = None
         if component_name == "bus":
             target_obj = self.bus
@@ -180,113 +115,125 @@ class OptimizationStrategy(ABC):
         if not target_obj:
             return False
 
-        # Apply Delta
         if delta > 0:
             if self._check_max_resource():
                 target_obj.flow_rate += delta
                 return True
         elif delta < 0:
             if target_obj.flow_rate > 1:
-                target_obj.flow_rate += delta  # delta is negative
+                target_obj.flow_rate += delta
                 return True
-
         return False
 
-# -----------------------------------------------------------
-# STRATEGY 1: BIOLOGICAL (The Original "Self-Org" Logic)
-# -----------------------------------------------------------
-class BiologicalStrategy(OptimizationStrategy):
-    """
-    The original logic:
-    Extends Fundamental Growth with "Vibration":
-    If the system settles into a stable but suboptimal state (low self-org measure),
-    this strategy injects entropy to shake it out of the local minimum.
-    """
 
-    def setup(self):
-        # 1. Start Fundamental Loops (Growth/Shrinkage)
-        super().setup()
+# ==========================================
+# 2. THE MIXINS (Modular Behaviors)
+# ==========================================
+class FundamentalMixin:
+    """Reactive scaling feedback loops based on queue sizes and feedback successes."""
+    def setup_fundamental(self):
+        self.env.process(self.monitor_sensors())
+        self.env.process(self.monitor_component("bus", self.bus, self.ctx.bus_input_queue))
+        self.env.process(self.monitor_component("edge", self.edge, self.ctx.bus_edge_queue))
+        self.env.process(self.monitor_component("scada", self.scada, self.ctx.bus_scada_queue))
 
-        # 2. Start Biological Vibration Loop
+    def monitor_sensors(self):
+        while True:
+            feedback = yield self.ctx.bus_iiot_queue.get()
+            if feedback.status:
+                self.add_iiot()
+            else:
+                self.remove_sensor(feedback.creator)
+                if len(self.ctx.iiot_list) == 0:
+                    self.add_iiot()
+
+            if not self._check_max_resource() and len(self.ctx.iiot_list) > 1:
+                self.remove_sensor()
+            yield self.env.timeout(0.01)
+
+    def monitor_component(self, name, agent, queue):
+        last_downgrade_time = -self.cooldown_ticks
+        while True:
+            yield self.env.timeout(0.1)
+            q_len = len(queue.items)
+
+            if q_len > agent.flow_rate * self.threshold_mult:
+                self.modify_flow_rate(name, 1)
+            elif q_len == 0:
+                if (self.env.now - last_downgrade_time) >= self.cooldown_ticks:
+                    if self.modify_flow_rate(name, -1):
+                        last_downgrade_time = self.env.now
+
+class BiologicalMixin:
+    """Injects entropy/vibration to escape local minima in self-organization."""
+    def setup_biological(self):
         self.env.process(self.self_org_manager())
 
     def self_org_manager(self):
-        """
-        Monitors the 'Self-Organization Measure' (Entropy).
-        If the system is too static (< Threshold), randomly perturb agents.
-        """
         while True:
-            yield self.env.timeout(1.0)  # Check every 1s (less aggressive)
-
-
-            # Need enough history
+            yield self.env.timeout(1.0)
             if len(self.ctx.self_organization_measure) > 10:
-                # Get latest measure
                 last_measure = list(self.ctx.self_organization_measure.values())[-1]
-
                 if last_measure < self.config.self_org_threshold:
-
-                    # System is Stagnant -> Inject Entropy
                     self._inject_entropy()
 
     def _inject_entropy(self):
-        # Randomly pick an action
         action_type = random.choice(['sensor', 'bus', 'edge', 'scada'])
         direction = random.choice([1, -1])
 
         if action_type == 'sensor':
-            if direction == 1:
-                self.add_iiot()
-            else:
-                self.remove_sensor()
+            if direction == 1: self.add_iiot()
+            else: self.remove_sensor()
         else:
             self.modify_flow_rate(action_type, direction)
 
-# -----------------------------------------------------------
-# STRATEGY 2: QoS (Quality of Service - get important information first)
-# -----------------------------------------------------------
-
-class QoSStrategy(OptimizationStrategy):
-    """
-    Static Benchmark Strategy:
-    - Topology remains fixed (no growth/pruning).
-    - Prioritizes traffic: Target > Feedback > Intel.
-    - Consumes feedback only to prevent memory leaks.
-    """
-
-    def setup(self):
-        # Start Fundamental Loops
-        super().setup()
-
+class QoSMixin:
+    """Prioritizes critical traffic dynamically (Overloads get_priority method)."""
     def get_priority(self, packet):
-        # High Priority for Critical Actions, Low for Raw Data
         return calculate_qos_priority(packet)
 
+class GAMixin:
+    """Online (1+1)-Evolution Strategy Hill-Climber."""
+    def setup_ga(self):
+        self.current_reward = -float('inf')
+        self.env.process(self.evolution_loop())
 
-# -----------------------------------------------------------
-# STRATEGY 3: REINFORCEMENT LEARNING (Direct Control)
-# -----------------------------------------------------------
-class RLStrategy(OptimizationStrategy):
-    """
-    RL Strategy:
-    - Loads a pre-trained PPO model from disk.
-    - Uses the model to predict actions based on system state.
-    - Falls back to Random if no model is found.
-    """
+    def evolution_loop(self):
+        evaluation_window = 10.0
+        while True:
+            prev_params = self.threshold_mult
+            mutation = random.uniform(-1.0, 1.0)
+            self.threshold_mult = max(2.0, min(10.0, self.threshold_mult + mutation))
 
-    def setup(self):
-        # Initialize internal state tracker
+            start_success = self.get_total_success()
+            start_cost = self.get_current_cost()
+
+            yield self.env.timeout(evaluation_window)
+
+            end_success = self.get_total_success()
+            end_cost = self.get_current_cost()
+
+            delta_success = end_success - start_success
+            avg_cost = (start_cost + end_cost) / 2
+            fitness = (delta_success * 10) - avg_cost
+
+            if fitness > self.current_reward:
+                self.current_reward = fitness
+            else:
+                self.threshold_mult = prev_params
+
+class RLMixin:
+    """Reinforcement Learning inference loop."""
+    def setup_rl(self):
+        # Initialize internal state trackers locally for the mixin
         self.last_success_count = 0
         self.last_time = 0
-
-        # Load the "Brain"
         self.model = None
         model_path = "models/PPO/isr_final_model.zip"
 
         if SB3_AVAILABLE and os.path.exists(model_path):
             try:
                 self.model = PPO.load(model_path)
-                # print(f"RL Strategy: Loaded model from {model_path}")
             except Exception as e:
                 print(f"RL Strategy: Failed to load model. Error: {e}")
         else:
@@ -295,43 +242,23 @@ class RLStrategy(OptimizationStrategy):
             else:
                 print(f"RL Strategy: Model not found at {model_path}")
 
-        # Start the RL Decision Loop
         self.env.process(self.rl_step_loop())
 
     def rl_step_loop(self):
-        """
-        The 'Gym Step' equivalent running inside the simulation.
-        """
         while True:
-            # 1. Wait for next step (Simulates discrete time steps)
             yield self.env.timeout(1.0)
-
-            # 2. Observe (Get State)
             state_list = self.get_state()
-
-            # SB3 expects a Numpy array
             obs = np.array(state_list, dtype=np.float32)
 
-            # 3. Decide (Policy)
             if self.model:
-                # Predict action using the trained brain
-                # deterministic=True means "Do the best thing you know", no exploration noise
                 action, _ = self.model.predict(obs, deterministic=True)
-
-                # SB3 actions are numpy arrays/scalars, convert to int
                 action = int(action)
             else:
-                # Fallback to Random if training failed or model missing
                 action = random.choice(range(9))
 
-            # 4. Act (Apply)
             self.apply_action(action)
 
     def get_state(self):
-        """
-        Returns a simplified state vector:
-        [Bus_Q, Edge_Q, Scada_Q, Num_Sensors, Bus_Rate, Edge_Rate, Scada_Rate]
-        """
         return [
             len(self.ctx.bus_input_queue.items),
             len(self.ctx.bus_edge_queue.items),
@@ -343,185 +270,80 @@ class RLStrategy(OptimizationStrategy):
         ]
 
     def calculate_reward(self):
-        """
-        Reward = (New Successes * Weight) - (Resource Cost * Weight)
-        """
-        # Get total successes so far (safe access)
-        if self.ctx.successful_operations_total:
-            current_total_success = list(self.ctx.successful_operations_total.values())[-1]
-        else:
-            current_total_success = 0
-
+        current_total_success = self.get_total_success()
         new_successes = current_total_success - self.last_success_count
         self.last_success_count = current_total_success
-
-        # Calculate Cost (Active Agents + Bandwidth)
-        current_resources = (len(self.ctx.iiot_list) +
-                             self.bus.flow_rate +
-                             self.edge.flow_rate +
-                             self.scada.flow_rate)
-
-        # Reward Function
-        # We value 1 Success as worth 50 Resource units (Arbitrary Tuning)
-        reward = (new_successes * 50) - current_resources
+        reward = (new_successes * 50) - self.get_current_cost()
         return reward
 
     def apply_action(self, action_idx):
-        """
-        Maps discrete action indices to the Unified Action API.
-
-        0: No Op
-        1: Add Sensor
-        2: Remove Sensor
-        3: Bus Rate +
-        4: Bus Rate -
-        5: Edge Rate +
-        6: Edge Rate -
-        7: SCADA Rate +
-        8: SCADA Rate -
-        """
-        if action_idx == 0:
-            pass
-        elif action_idx == 1:
-            self.add_iiot()
+        if action_idx == 0: pass
+        elif action_idx == 1: self.add_iiot()
         elif action_idx == 2:
-            if len(self.ctx.iiot_list)> 1:
-                self.remove_sensor()
-        elif action_idx == 3:
-            self.modify_flow_rate("bus", 1)
-        elif action_idx == 4:
-            self.modify_flow_rate("bus", -1)
-        elif action_idx == 5:
-            self.modify_flow_rate("edge", 1)
-        elif action_idx == 6:
-            self.modify_flow_rate("edge", -1)
-        elif action_idx == 7:
-            self.modify_flow_rate("scada", 1)
-        elif action_idx == 8:
-            self.modify_flow_rate("scada", -1)
+            if len(self.ctx.iiot_list) > 1: self.remove_sensor()
+        elif action_idx == 3: self.modify_flow_rate("bus", 1)
+        elif action_idx == 4: self.modify_flow_rate("bus", -1)
+        elif action_idx == 5: self.modify_flow_rate("edge", 1)
+        elif action_idx == 6: self.modify_flow_rate("edge", -1)
+        elif action_idx == 7: self.modify_flow_rate("scada", 1)
+        elif action_idx == 8: self.modify_flow_rate("scada", -1)
 
+# ==========================================
+# 3. ASSEMBLED STRATEGIES (Assembly Only)
+# ==========================================
 
-# -----------------------------------------------------------
-# STRATEGY 4: GENETIC ALGORITHM (Online Hill-Climber)
-# -----------------------------------------------------------
-class GAStrategy(OptimizationStrategy):
-    """
-    Online Evolutionary Strategy:
-    - Instead of controlling actions directly, it evolves the *Parameters* used by the reactive loops (e.g. threshold_mult).
-    - Uses a (1+1)-ES (Evolution Strategy) approach:
-      1. Mutate current params.
-      2. Run for window 'W'.
-      3. If Reward > Prev_Reward: Keep mutation. Else: Revert.
-    """
+# 1. Pure Control
+class StaticStrategy(BaseStrategy):
+    pass
 
+# 2. Fundamental Combinations
+class PureFundamentalStrategy(FundamentalMixin, BaseStrategy):
     def setup(self):
-        # 1. Start the standard reactive loops (which use self.threshold_mult)
-        super().setup()
+        self.setup_fundamental()
 
-        # 2. Start the Evolution Loop
-        self.current_reward = -float('inf')
-        self.env.process(self.evolution_loop())
-
-    def evolution_loop(self):
-        evaluation_window = 10.0  # Time to test new genes
-
-        while True:
-            # --- SNAPSHOT BEFORE ---
-            prev_params = self.threshold_mult
-
-            # --- MUTATE ---
-            # Randomly adjust the threshold multiplier (Range 2.0 to 10.0)
-            mutation = random.uniform(-1.0, 1.0)
-            self.threshold_mult = max(2.0, min(10.0, self.threshold_mult + mutation))
-
-            # --- EVALUATE ---
-            # Run simulation for the window
-            start_success = self.get_total_success()
-            start_cost = self.get_current_cost()
-
-            yield self.env.timeout(evaluation_window)
-
-            end_success = self.get_total_success()
-            end_cost = self.get_current_cost()
-
-            # Calculate Fitness (Gain in success vs Cost)
-            delta_success = end_success - start_success
-            avg_cost = (start_cost + end_cost) / 2
-            fitness = (delta_success * 10) - avg_cost
-
-            # --- SELECTION ---
-            if fitness > self.current_reward:
-                # Keep the mutation (It worked!)
-                self.current_reward = fitness
-                # Optional: print(f"GA Improved: New Threshold = {self.threshold_mult:.2f}, Fitness = {fitness}")
-            else:
-                # Revert (It failed)
-                self.threshold_mult = prev_params
-                # We do not update self.current_reward, keeping the high watermark
-
-    def get_total_success(self):
-        if self.ctx.successful_operations_total:
-            return list(self.ctx.successful_operations_total.values())[-1]
-        return 0
-
-    def get_current_cost(self):
-        return (len(self.ctx.iiot_list) +
-                self.bus.flow_rate +
-                self.edge.flow_rate +
-                self.scada.flow_rate)
-
-# -----------------------------------------------------------
-# STRATEGY 0: Resources Never Change (Online Hill-Climber)
-# -----------------------------------------------------------
-
-class StaticStrategy(OptimizationStrategy):
-    """
-    Experiment Emergence: The Null Hypothesis.
-    Resources are fixed at initialization and never change.
-    This creates the baseline for 'Independence'.
-    """
-
+# 3. Biological Combinations
+class PureBiologicalStrategy(BiologicalMixin, BaseStrategy):
     def setup(self):
-        # We start the loops to keep the architecture consistent,
-        # but the methods themselves will be inert.
-        super().setup()
+        self.setup_biological()
 
-    def monitor_sensors(self):
-        """Override: Do nothing. No sensors added/removed."""
-        while True:
-            yield self.env.timeout(float('inf'))  # Sleep forever
-
-    def monitor_component(self, name, agent, queue):
-        """Override: Do nothing. No flow rate changes."""
-        while True:
-            yield self.env.timeout(float('inf'))  # Sleep forever
-
-    def self_org_manager(self):
-        """Override: No biological vibration."""
-        while True:
-            yield self.env.timeout(float('inf'))
-
-
-# -----------------------------------------------------------
-# STRATEGY 5: FUNDAMENTAL ONLY
-# -----------------------------------------------------------
-class FundamentalStrategy(OptimizationStrategy):
-    """
-    Pure fundamental reactive loops.
-    Only grows/shrinks based on queues and feedback. No vibration, no QoS.
-    """
+class BiologicalStrategy(BiologicalMixin, FundamentalMixin, BaseStrategy):
+    """The original Bio loop: Fundamental scaling + Entropy injections."""
     def setup(self):
-        # Starts the base monitor_sensors and monitor_component loops only
-        super().setup()
+        self.setup_fundamental()
+        self.setup_biological()
 
-# -----------------------------------------------------------
-# STRATEGY 6: QoS + BIOLOGICAL
-# -----------------------------------------------------------
-class QoSBioStrategy(BiologicalStrategy):
-    """
-    Combines Biological vibration (from BiologicalStrategy) with
-    traffic prioritization (from QoSStrategy).
-    """
-    def get_priority(self, packet):
-        # High Priority for Critical Actions, Low for Raw Data
-        return calculate_qos_priority(packet)
+# 4. QoS Combinations
+class PureQoSStrategy(QoSMixin, BaseStrategy):
+    pass
+
+class QoSStrategy(QoSMixin, FundamentalMixin, BaseStrategy):
+    """The original QoS benchmark: Prioritization + Fundamental scaling."""
+    def setup(self):
+        self.setup_fundamental()
+
+class PureQoSBioStrategy(QoSMixin, BiologicalMixin, BaseStrategy):
+    """QoS prioritization + Entropy injections (No queue-based reactive scaling)."""
+    def setup(self):
+        self.setup_biological()
+
+class QoSBioStrategy(QoSMixin, BiologicalMixin, FundamentalMixin, BaseStrategy):
+    """The ultimate combo: Prioritization + Scaling + Entropy."""
+    def setup(self):
+        self.setup_fundamental()
+        self.setup_biological()
+
+# 5. GA Combinations
+class PureGAStrategy(GAMixin, BaseStrategy):
+    def setup(self):
+        self.setup_ga()
+
+class GAStrategy(GAMixin, FundamentalMixin, BaseStrategy):
+    """GA Tuning the Fundamental reactive threshold."""
+    def setup(self):
+        self.setup_fundamental()
+        self.setup_ga()
+
+# 6. Reinforcement Learning
+class RLStrategy(RLMixin, BaseStrategy):
+    def setup(self):
+        self.setup_rl()

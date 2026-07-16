@@ -9,10 +9,11 @@ METRIC = "Final_Success"
 
 
 def main():
+    input_file = sys.argv[1] if len(sys.argv) > 1 else "sensitivity_results.csv"
     try:
-        df = pd.read_csv("sensitivity_results.csv")
+        df = pd.read_csv(input_file)
     except FileNotFoundError:
-        print("Error: 'sensitivity_results.csv' not found. Run sensitivity_sweep.py first.")
+        print("Error: '{input_file}' not found. Run sensitivity_sweep.py first.")
         sys.exit(1)
 
     print("--- Statistical Validation (T-Test) ---")

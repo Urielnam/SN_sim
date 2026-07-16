@@ -6,7 +6,7 @@ import sys
 
 # Define the output file name from your sweep script
 # (Check if your sensitivity_sweep.py outputs 'mega_sweep_results.csv' or 'sensitivity_results.csv')
-INPUT_FILE = "mega_sweep_results.csv"
+INPUT_FILE = sys.argv[1] if len(sys.argv) > 1 else "mega_sweep_results.csv"
 
 
 def set_style():

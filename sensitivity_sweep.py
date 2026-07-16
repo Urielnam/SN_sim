@@ -4,8 +4,9 @@ import itertools
 from sim_config import SimulationConfig
 import Simulation
 import time
-from datetime import timedelta
+from datetime import timedelta, datetime
 import traceback
+import os
 
 # --- CONFIGURATION FOR MEGA SWEEP ---
 
@@ -13,17 +14,20 @@ SWEEP_CONFIG = {
 
     # 1. Physics Parameters
     "dt": [1],  # Granularity of decision making
+    #0.1,0.3,0.5,0.7,0.9
     "iiot_acc": [0.1,0.3,0.5,0.7,0.9],  # Sensor quality
-    # 100, 500,1000,1500,
-    "max_resource": [2000],  # Budget constraint
+    # 100, 500,1000,1500,2000
+    "max_resource": [100, 500, 1000, 1500, 2000],  # Budget constraint
     "self_org_threshold": [5],  # Volatility tolerance (Bio only)
 
     # 2. Strategies to Compare
-    # "optimization_method": ["biological", "qos", "ga","fundamental", "qos_bio"],
-    "optimization_method": ["qos_bio"],
+    # "optimization_method": ["static", "pure_fundamental", "pure_biological", "biological", "pure_qos", "qos", "ga",
+    # "pure_qos_bio", "qos_bio", "pure_ga", "ga", "rl"],
+    "optimization_method": ["static", "pure_fundamental", "pure_biological", "biological", "pure_qos", "qos",
+                            "pure_qos_bio", "qos_bio"],
 
     # 3. Statistical Rigor
-    "iterations_per_combo": 30  # Keep low (3-5) for mega sweeps, or it will run for days
+    "iterations_per_combo": 10  # Keep low (3-5) for mega sweeps, or it will run for days
 }
 
 
@@ -32,7 +36,7 @@ def run_single_worker(params):
     Unpacks parameters and runs one simulation.
     """
     # Unpack the tuple from itertools
-    (dt, acc, res, thresh, strat, run_id) = params
+    (dt, acc, res, thresh, strat, run_id, traces_dir) = params
 
     # Base Config
     config = SimulationConfig(
@@ -59,6 +63,19 @@ def run_single_worker(params):
     # We catch errors to prevent one crash from killing the whole sweep
     try:
         data = Simulation.main_run(config, overrides)
+
+        # Save Timeline Trace to Parquet directly from the worker
+        # Create a deterministic, collision-proof filename using the parameter space
+        trace_file = os.path.join(traces_dir, f"run_{strat}_res{res}_acc{acc}_th{thresh}_id{run_id}.parquet")
+        if "state_snapshots" in data and data["state_snapshots"]:
+            df_trace = pd.DataFrame(data["state_snapshots"])
+            # Inject Metadata for downstream plotting
+            df_trace["Strategy"] = strat
+            df_trace["Run_ID"] = run_id
+            df_trace["Max_Resource"] = res
+            df_trace["Sensor_Acc"] = acc
+            df_trace.to_parquet(trace_file, index=False)
+
         success = data["final_success_count"]
         cost = data["final_resource_cost"]
 
@@ -104,6 +121,19 @@ def run_single_worker(params):
 if __name__ == "__main__":
     print("Generating Task List...")
 
+    # Setup unique run directories using existing BackendClasses method
+    now = datetime.now().strftime("%Y%m%d_%H%M%S")
+    base_dir = os.path.join("results", "raw_data", now)
+    traces_dir = os.path.join(base_dir, "traces")
+    os.makedirs(traces_dir, exist_ok=True)
+
+    master_csv = os.path.join(base_dir, "master_summary.csv")
+
+    # Initialize empty master CSV with headers
+    headers = ["Strategy", "DT", "Sensor_Acc", "Max_Res", "Threshold", "Run_ID", "Final_Success", "Final_Cost",
+               "Avg_Latency", "Execution_Time_Sec", "Avg_Self_Org"]
+    pd.DataFrame(columns=headers).to_csv(master_csv, index=False)
+
     # Create all combinations using Cartesian Product
     keys = ["dt", "iiot_acc", "max_resource", "self_org_threshold", "optimization_method"]
     values = [SWEEP_CONFIG[k] for k in keys]
@@ -117,13 +147,16 @@ if __name__ == "__main__":
     for combo in combinations:
         (dt, acc, res, thresh, strat, run_id) = combo
 
+        # Inject traces_dir into the task parameters
+        task_params = (dt, acc, res, thresh, strat, run_id, traces_dir)
+
         if strat in ["biological","qos_bio"]:
-            filtered_combinations.append(combo)
+            filtered_combinations.append(task_params)
         else:
             # For non-bio, only run if thresh is the first value in the list
             # (Assuming the first value is the "default" for comparisons)
             if thresh == SWEEP_CONFIG["self_org_threshold"][0]:
-                filtered_combinations.append(combo)
+                filtered_combinations.append(task_params)
 
     print(f"Total Simulations to Run: {len(filtered_combinations)}")
     per_sim = 14.5
@@ -132,15 +165,18 @@ if __name__ == "__main__":
     print(f"Estimated Time (at {per_sim} sec/sim on 8 cores): {time_delta}")
 
     # Execute in Parallel
-    with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
+    # old unlimited line:  "with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:"
+    with multiprocessing.Pool(processes=2) as pool:
         # Use imap_unordered for better progress tracking if you wanted to add tqdm later
-        results = pool.map(run_single_worker, filtered_combinations)
+        for result in pool.imap_unordered(run_single_worker, filtered_combinations):
+            # Append single row to master CSV immediately (avoids race conditions)
+            pd.DataFrame([result]).to_csv(master_csv, mode='a', header=False, index=False)
+            print(f"Finished: {result['Strategy']} | Run_ID: {result['Run_ID']} | Success: {result['Final_Success']}")
 
-    # Save
-    df = pd.DataFrame(results)
-    filename = "mega_sweep_results.csv"
-    df.to_csv(filename, index=False)
+    print(f"\n--- Mega Sweep Complete. Master summary saved to {master_csv} ---")
 
-    print(f"\n--- Mega Sweep Complete. Saved to {filename} ---")
-    print(df.groupby(["Strategy"]).mean(numeric_only=True)[["Final_Success", "Final_Cost"]])
-    print(f"Average Sim Time: {df['Execution_Time_Sec'].mean():.4f} seconds")
+    # Reload the master CSV for the final printouts
+    final_df = pd.read_csv(master_csv)
+    print(final_df.groupby(["Strategy"]).mean(numeric_only=True)[["Final_Success", "Final_Cost"]])
+    print(f"Average Sim Time: {final_df['Execution_Time_Sec'].mean():.4f} seconds")
+
