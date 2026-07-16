@@ -332,14 +332,14 @@ def snapshot_system_state(ctx, bus, edge, scada, window_size=10):
     # 3. Construct the Vector
     vector = {
         "time": current_time,
-        "num_iiots": len(ctx.iiot_list),            # v1
-        "bus_flow": bus.flow_rate,                  # v2
-        "edge_flow": edge.flow_rate,                # v3
-        "scada_flow": scada.flow_rate,              # v4
-        "queue_len": len(ctx.bus_input_queue.items),# v5
+        "num_iiots": len(ctx.iiot_list),            # x1
+        "bus_flow": bus.flow_rate,                  # x2
+        "edge_flow": edge.flow_rate,                # x3
+        "scada_flow": scada.flow_rate,              # x4
+        "queue_len": len(ctx.bus_input_queue.items),# x5
         "success_rate": success_count,              # v6
         "cumulative_success": len(ctx.successful_operations),
-        "avg_latency": avg_data_age,
+        "avg_latency": avg_data_age,                # x7
         "feedback_state": scada.current_feedback,
         "self_org": latest_self_org
     }
