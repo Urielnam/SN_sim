@@ -1,6 +1,6 @@
 # sim_config.py
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, List
 
 
 @dataclass
@@ -17,6 +17,9 @@ class SimulationConfig:
 
     # Optimization Strategy Selector
     optimization_method: str = "biological"
+
+    p2p_matrix: list = None
+    s2p_matrix: list = None
 
     data_type_keys = ["intel", "feedback", "target"]
 

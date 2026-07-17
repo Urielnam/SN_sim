@@ -26,6 +26,8 @@ def main_run(config, overrides=None):
             if hasattr(config, k):
                 setattr(config, k, v)
 
+    # print("DEBUG - Config has p2p_matrix:", hasattr(config, 'p2p_matrix'))
+
     now = datetime.now().ctime().replace(":", "_")
 
     def metric_monitor(ctx, bus, edge, scada, visualizer=None):
@@ -74,36 +76,28 @@ def main_run(config, overrides=None):
     strategy_mapping = {
         # Baseline
         "static": strategies.StaticStrategy,
-
         # Fundamental
         "pure_fundamental": strategies.PureFundamentalStrategy,
-
         # Biological
         "pure_biological": strategies.PureBiologicalStrategy,
-
         # Bio + Fund
         "biological": strategies.BiologicalStrategy,
-
         # QoS
         "pure_qos": strategies.PureQoSStrategy,
-
         # QoS + Fund
         "qos": strategies.QoSStrategy,
-
         # QoS + Bio
         "pure_qos_bio": strategies.PureQoSBioStrategy,
-
         # QoS + Fund + Biological
         "qos_bio": strategies.QoSBioStrategy,
-
         # GA
         "pure_ga": strategies.PureGAStrategy,
-
         # GA + Fund
         "ga": strategies.GAStrategy,
-
         # RL
-        "rl": strategies.RLStrategy
+        "rl": strategies.RLStrategy,
+        # Placeholder for multiscale learning
+        "masked_random": strategies.MaskedRandomStrategy
     }
 
     strategy_class = strategy_mapping.get(
@@ -111,8 +105,15 @@ def main_run(config, overrides=None):
         strategies.StaticStrategy
     )
 
-    strategy = strategy_class(ctx, bus, edge, scada)
-    # Execute Strategy Setup
+    # Fetch matrices from config (will return None if not doing a sweep,
+    # which triggers the BaseStrategy's fully-observable defaults)
+    p2p = getattr(config, 'p2p_matrix', None)
+    s2p = getattr(config, 's2p_matrix', None)
+
+    # Uniform instantiation for ALL strategies
+    strategy = strategy_class(ctx, bus, edge, scada, p2p, s2p)
+
+    # Execute Strategy Setup[cite: 4]
     strategy.setup()
 
     # 7. Start Core Metrics

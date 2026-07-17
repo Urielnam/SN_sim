@@ -10,24 +10,49 @@ import os
 
 # --- CONFIGURATION FOR MEGA SWEEP ---
 
+# Define the matrix topologies you want to test
+FULLY_OBSERVABLE = {
+    "name": "full_vis",
+    "p2p": [[1, 1, 1, 1] for _ in range(4)],
+    "s2p": [[1, 1, 1] for _ in range(4)]
+}
+
+ISOLATED_AGENTS = {
+    "name": "isolated",
+    "p2p": [
+        [1, 0, 0, 0],
+        [0, 1, 0, 0],
+        [0, 0, 1, 0],
+        [0, 0, 0, 1]
+    ],
+    "s2p": [
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+        [0, 0, 0]
+    ]
+}
+
 SWEEP_CONFIG = {
 
     # 1. Physics Parameters
     "dt": [1],  # Granularity of decision making
     #0.1,0.3,0.5,0.7,0.9
-    "iiot_acc": [0.1,0.3,0.5,0.7,0.9],  # Sensor quality
+    "iiot_acc": [0.5],  # Sensor quality
     # 100, 500,1000,1500,2000
-    "max_resource": [100, 500, 1000, 1500, 2000],  # Budget constraint
+    "max_resource": [100],  # Budget constraint
     "self_org_threshold": [5],  # Volatility tolerance (Bio only)
 
     # 2. Strategies to Compare
     # "optimization_method": ["static", "pure_fundamental", "pure_biological", "biological", "pure_qos", "qos", "ga",
-    # "pure_qos_bio", "qos_bio", "pure_ga", "ga", "rl"],
-    "optimization_method": ["static", "pure_fundamental", "pure_biological", "biological", "pure_qos", "qos",
-                            "pure_qos_bio", "qos_bio"],
+    # "pure_qos_bio", "qos_bio", "pure_ga", "ga", "rl", "masked_random"],
+    "optimization_method": ["masked_random"],
 
-    # 3. Statistical Rigor
-    "iterations_per_combo": 10  # Keep low (3-5) for mega sweeps, or it will run for days
+    # 3. Information Topologies
+    "topology": [FULLY_OBSERVABLE, ISOLATED_AGENTS],
+
+    # 4. Statistical Rigor
+    "iterations_per_combo": 1  # Keep low (3-5) for mega sweeps, or it will run for days
 }
 
 
@@ -36,7 +61,7 @@ def run_single_worker(params):
     Unpacks parameters and runs one simulation.
     """
     # Unpack the tuple from itertools
-    (dt, acc, res, thresh, strat, run_id, traces_dir) = params
+    (dt, acc, res, thresh, strat, topology, run_id, traces_dir) = params
 
     # Base Config
     config = SimulationConfig(
@@ -51,7 +76,9 @@ def run_single_worker(params):
         "dt": dt,
         "iiot_acc": acc,
         "max_resource": res,
-        "self_org_threshold": thresh
+        "self_org_threshold": thresh,
+        "p2p_matrix": topology["p2p"],
+        "s2p_matrix": topology["s2p"]
     }
 
     # --- START TIMER ---
@@ -66,11 +93,12 @@ def run_single_worker(params):
 
         # Save Timeline Trace to Parquet directly from the worker
         # Create a deterministic, collision-proof filename using the parameter space
-        trace_file = os.path.join(traces_dir, f"run_{strat}_res{res}_acc{acc}_th{thresh}_id{run_id}.parquet")
+        trace_file = os.path.join(traces_dir, f"run_{strat}_{topology['name']}_res{res}_acc{acc}_th{thresh}_id{run_id}.parquet")
         if "state_snapshots" in data and data["state_snapshots"]:
             df_trace = pd.DataFrame(data["state_snapshots"])
             # Inject Metadata for downstream plotting
             df_trace["Strategy"] = strat
+            df_trace["Topology"] = topology["name"]
             df_trace["Run_ID"] = run_id
             df_trace["Max_Resource"] = res
             df_trace["Sensor_Acc"] = acc
@@ -130,12 +158,12 @@ if __name__ == "__main__":
     master_csv = os.path.join(base_dir, "master_summary.csv")
 
     # Initialize empty master CSV with headers
-    headers = ["Strategy", "DT", "Sensor_Acc", "Max_Res", "Threshold", "Run_ID", "Final_Success", "Final_Cost",
+    headers = ["Strategy", "Topology", "DT", "Sensor_Acc", "Max_Res", "Threshold", "Run_ID", "Final_Success", "Final_Cost",
                "Avg_Latency", "Execution_Time_Sec", "Avg_Self_Org"]
     pd.DataFrame(columns=headers).to_csv(master_csv, index=False)
 
     # Create all combinations using Cartesian Product
-    keys = ["dt", "iiot_acc", "max_resource", "self_org_threshold", "optimization_method"]
+    keys = ["dt", "iiot_acc", "max_resource", "self_org_threshold", "optimization_method", "topology"]
     values = [SWEEP_CONFIG[k] for k in keys]
 
     # Add iteration count to the combinations
@@ -145,10 +173,10 @@ if __name__ == "__main__":
     seen_non_bio = set()
 
     for combo in combinations:
-        (dt, acc, res, thresh, strat, run_id) = combo
+        (dt, acc, res, thresh, strat, topology, run_id) = combo
 
         # Inject traces_dir into the task parameters
-        task_params = (dt, acc, res, thresh, strat, run_id, traces_dir)
+        task_params = (dt, acc, res, thresh, strat, topology, run_id, traces_dir)
 
         if strat in ["biological","qos_bio"]:
             filtered_combinations.append(task_params)
