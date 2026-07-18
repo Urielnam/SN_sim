@@ -10,26 +10,19 @@ import os
 
 # --- CONFIGURATION FOR MEGA SWEEP ---
 
-# Define the matrix topologies you want to test
-FULLY_OBSERVABLE = {
-    "name": "full_vis",
-    "p2p": [[1, 1, 1, 1] for _ in range(4)],
-    "s2p": [[1, 1, 1] for _ in range(4)]
-}
-
 ISOLATED_AGENTS = {
     "name": "isolated",
     "p2p": [
-        [1, 0, 0, 0],
-        [0, 1, 0, 0],
-        [0, 0, 1, 0],
-        [0, 0, 0, 1]
+        [1, 1, 0, 0],
+        [0, 1, 1, 1],
+        [0, 0, 1, 1],
+        [0, 0, 1, 1]
     ],
     "s2p": [
-        [1, 0, 0],
+        [1, 1, 0],
         [0, 1, 0],
-        [0, 0, 1],
-        [0, 0, 0]
+        [0, 1, 1],
+        [0, 1, 0]
     ]
 }
 
@@ -45,14 +38,14 @@ SWEEP_CONFIG = {
 
     # 2. Strategies to Compare
     # "optimization_method": ["static", "pure_fundamental", "pure_biological", "biological", "pure_qos", "qos", "ga",
-    # "pure_qos_bio", "qos_bio", "pure_ga", "ga", "rl", "masked_random"],
-    "optimization_method": ["masked_random"],
+    # "pure_qos_bio", "qos_bio", "pure_ga", "ga", "rl", "masked_random", "masked_rl"],
+    "optimization_method": ["masked_rl"],
 
     # 3. Information Topologies
-    "topology": [FULLY_OBSERVABLE, ISOLATED_AGENTS],
+    "topology": [ISOLATED_AGENTS],
 
     # 4. Statistical Rigor
-    "iterations_per_combo": 1  # Keep low (3-5) for mega sweeps, or it will run for days
+    "iterations_per_combo": 10  # Keep low (3-5) for mega sweeps, or it will run for days
 }
 
 
@@ -194,7 +187,7 @@ if __name__ == "__main__":
 
     # Execute in Parallel
     # old unlimited line:  "with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:"
-    with multiprocessing.Pool(processes=2) as pool:
+    with multiprocessing.Pool(processes=1) as pool:
         # Use imap_unordered for better progress tracking if you wanted to add tqdm later
         for result in pool.imap_unordered(run_single_worker, filtered_combinations):
             # Append single row to master CSV immediately (avoids race conditions)

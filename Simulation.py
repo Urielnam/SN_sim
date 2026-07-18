@@ -97,7 +97,8 @@ def main_run(config, overrides=None):
         # RL
         "rl": strategies.RLStrategy,
         # Placeholder for multiscale learning
-        "masked_random": strategies.MaskedRandomStrategy
+        "masked_random": strategies.MaskedRandomStrategy,
+        "masked_rl": strategies.MaskedRLStrategy
     }
 
     strategy_class = strategy_mapping.get(
